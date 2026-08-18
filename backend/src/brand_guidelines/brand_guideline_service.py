@@ -65,13 +65,21 @@ def _process_brand_guideline_in_background(
     original_filename: str,
     source_gcs_uri: str,
     workspace_id: int | None,
+    user_email: str | None = None,  # THREAD_CONTEXT_PROPAGATION_FIX_V1
 ):
     """This is the long-running worker task that runs in a separate thread.
     It handles PDF splitting, uploading, AI extraction, and database updates.
     """
     import asyncio
 
+    from src.common.token_logger import current_user_email
     from src.database import WorkerDatabase
+
+    # THREAD_CONTEXT_PROPAGATION_FIX_V1: ThreadPoolExecutor.submit() does NOT copy contextvars.Context
+    # into the new thread, so current_user_email would otherwise default to "unknown"
+    # here. Explicitly re-establish it using the email passed in from the request
+    # handler (which had the correct authenticated context).
+    current_user_email.set(user_email or "unknown")
 
     worker_logger = logging.getLogger(f"brand_guideline_worker.{guideline_id}")
     worker_logger.setLevel(logging.INFO)
@@ -144,10 +152,14 @@ def _process_brand_guideline_in_background(
                         # Assuming extract_brand_info_from_pdf is synchronous (based on previous usage),
                         # we run it in an executor.
 
-                        loop = asyncio.get_running_loop()
+                        # CONTEXTVAR_PROPAGATION_FIX_V1: switched from loop.run_in_executor() to
+                        # asyncio.to_thread(), which (unlike run_in_executor) copies the
+                        # current contextvars.Context into the new thread. Without this,
+                        # current_user_email was resetting to its default "unknown" inside
+                        # extract_brand_info_from_pdf, so token_usage rows for this feature
+                        # were logged with user_email='unknown' instead of the real user.
                         tasks = [
-                            loop.run_in_executor(
-                                None,
+                            asyncio.to_thread(
                                 gemini_service.extract_brand_info_from_pdf,
                                 uri,
                             )
@@ -450,6 +462,7 @@ class BrandGuidelineService:
             original_filename=original_filename,
             workspace_id=workspace_id,
             source_gcs_uri=gcs_uri,
+            user_email=current_user.email,  # THREAD_CONTEXT_PROPAGATION_FIX_V1
         )
 
         logger.info(
