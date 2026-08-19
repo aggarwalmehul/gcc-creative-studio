@@ -98,7 +98,14 @@ def _process_video_in_background(
     The long-running process that generates video, thumbnails, and updates the
     database record upon completion or failure.
     """
+    from src.common.token_logger import current_user_email
     from src.database import WorkerDatabase
+
+    # VIDEO_WORKER_CONTEXTVAR_FIX_V1: ThreadPoolExecutor.submit() does NOT copy contextvars.Context
+    # into the new thread. user_email is already passed in as a parameter (see call
+    # site), but it was never used to (re)establish current_user_email here, so
+    # log_tokens() calls inside this worker logged user_email="unknown".
+    current_user_email.set(user_email or "unknown")
 
     # In a new process, the logging configuration is reset. We must re-configure it
     # to see logs with a level of INFO or lower.
@@ -992,9 +999,16 @@ def _process_video_in_background(
 def _process_video_concatenation_in_background(
     media_item_id: int,
     request_dto: ConcatenateVideosDto,
+    user_email: str | None = None,  # VIDEO_CONCAT_CONTEXTVAR_FIX_V1
 ):
     """Background worker to concatenate multiple videos."""
+    from src.common.token_logger import current_user_email
     from src.database import WorkerDatabase
+
+    # VIDEO_CONCAT_CONTEXTVAR_FIX_V1: ThreadPoolExecutor.submit() does NOT copy contextvars.Context
+    # into the new thread, so current_user_email would otherwise default to
+    # "unknown" here.
+    current_user_email.set(user_email or "unknown")
 
     worker_logger = logging.getLogger(f"video_concat_worker.{media_item_id}")
     worker_logger.setLevel(logging.INFO)
@@ -1421,6 +1435,7 @@ class VeoService:
             _process_video_concatenation_in_background,
             media_item_id=placeholder_item.id,
             request_dto=request_dto,
+            user_email=user.email,  # VIDEO_CONCAT_CONTEXTVAR_FIX_V1
         )
 
         logger.info("Video concatenation job queued: %s", placeholder_item.id)
