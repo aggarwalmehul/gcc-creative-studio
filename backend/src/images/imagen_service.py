@@ -111,7 +111,14 @@ def _process_vto_in_background(
     import os
     import sys
 
+    from src.common.token_logger import current_user_email
+
     # google.cloud.logging moved to top level
+
+    # VTO_WORKER_CONTEXTVAR_FIX_V1: ThreadPoolExecutor.submit() does NOT copy
+    # contextvars.Context into the new thread, so current_user_email would
+    # otherwise default to "unknown" here.
+    current_user_email.set(current_user.email or "unknown")
 
     worker_logger = logging.getLogger(f"vto_worker.{media_item_id}")
     worker_logger.setLevel(logging.INFO)
@@ -591,11 +598,18 @@ def _process_image_in_background(
     import os
     import sys
 
+    from src.common.token_logger import current_user_email
+
     # google.cloud.logging moved to top level
 
     from src.brand_guidelines.repository.brand_guideline_repository import (
         BrandGuidelineRepository,
     )
+
+    # IMAGE_WORKER_CONTEXTVAR_FIX_V1: ThreadPoolExecutor.submit() does NOT copy
+    # contextvars.Context into the new thread, so current_user_email would
+    # otherwise default to "unknown" here.
+    current_user_email.set(current_user.email or "unknown")
 
     worker_logger = logging.getLogger(f"image_worker.{media_item_id}")
     worker_logger.setLevel(logging.INFO)
@@ -1028,12 +1042,19 @@ def _process_upload_upscale_in_background(
     """Background worker to handle image upscale, GCS upload, and DB update."""
     # time is removed
 
+    from src.common.token_logger import current_user_email
+
     # google.cloud.logging moved to top level
 
     # Inner imports moved or removed
     # Remaining redundant inner imports removed
     # Redundant inner imports removed
     from src.source_assets.source_asset_service import SourceAssetService
+
+    # UPSCALE_WORKER_CONTEXTVAR_FIX_V1: ThreadPoolExecutor.submit() does NOT copy
+    # contextvars.Context into the new thread, so current_user_email would
+    # otherwise default to "unknown" here.
+    current_user_email.set(user.email or "unknown")
 
     worker_logger = logging.getLogger(f"upscale_worker.{media_item_id}")
     worker_logger.setLevel(logging.INFO)

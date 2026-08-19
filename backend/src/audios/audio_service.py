@@ -59,7 +59,14 @@ def _process_audio_in_background(
     user_email: str,
     user_id: int,
 ):
+    from src.common.token_logger import current_user_email
     from src.database import WorkerDatabase
+
+    # AUDIO_WORKER_CONTEXTVAR_FIX_V1: ThreadPoolExecutor.submit() does NOT copy
+    # contextvars.Context into the new thread, so current_user_email would
+    # otherwise default to "unknown" here. user_email is already passed in
+    # as a parameter (see call site).
+    current_user_email.set(user_email or "unknown")
 
     worker_logger = logging.getLogger(f"audio_worker.{media_item_id}")
     worker_logger.setLevel(logging.INFO)
