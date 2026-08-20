@@ -32,6 +32,7 @@ export interface ModelCapability {
   supportedResolutions: ('1K' | '2K' | '4K')[]; // e.g., ['1K', '2K', '4K']
   supportedDurations: number[];
   supportsAudio?: boolean; // For video
+  supportsVideoExtension?: boolean; // VIDEO_EXTENSION_CAPABILITY_FIX_V1; only Omni models support Turn 2 extension
   supportsNegativePrompt?: boolean;
   supportsGoogleSearch?: boolean;
   supportsVoice?: boolean;
@@ -238,6 +239,7 @@ export const MODEL_CONFIGS: GenerationModelConfig[] = [
       supportedResolutions: ['1K'],
       supportedDurations: [4, 6, 8, 10],
       supportsAudio: true,
+      supportsVideoExtension: true, // VIDEO_EXTENSION_CAPABILITY_FIX_V1
     },
   },
   {

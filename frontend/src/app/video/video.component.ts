@@ -565,6 +565,27 @@ export class VideoComponent implements OnInit, AfterViewInit {
       this.isConcatenateMode = false;
     }
 
+    // VIDEO_EXTENSION_MODEL_CLAMP_V1: not all models support video extension (Turn 2) --
+    // only Gemini Omni models do. Auto-switch to Omni Flash if the current
+    // model can't extend, same UX pattern as the existing Veo 3.0 auto-switch.
+    if (mode === 'Extend Video') {
+      const currentModelConfig = MODEL_CONFIGS.find(
+        m => m.value === this.searchRequest.generationModel,
+      );
+      if (!currentModelConfig?.capabilities?.supportsVideoExtension) {
+        const omniModel = this.generationModels.find(
+          m => m.value === 'gemini-omni-flash-preview',
+        );
+        if (omniModel) {
+          this.selectModel(omniModel);
+          handleSuccessSnackbar(
+            this._snackBar,
+            `${currentModelConfig?.viewValue || 'This model'} doesn't support video extension, so we've switched to Gemini Omni for you.`,
+          );
+        }
+      }
+    }
+
     this.saveState();
   }
 
@@ -648,6 +669,23 @@ export class VideoComponent implements OnInit, AfterViewInit {
       );
       return;
     }
+
+    // FRAME_INTERPOLATION_VALIDATION_V1: Google's Veo API requires a start frame whenever an
+    // end/last frame is provided (an end-only frame triggers "Frame
+    // interpolation requires both an input image and a last frame"). A
+    // start-only frame is valid (normal image-to-video, not interpolation).
+    if (
+      this.currentMode === 'Frames to Video' &&
+      this.endImageAssetId !== null &&
+      this.startImageAssetId === null
+    ) {
+      handleInfoSnackbar(
+        this._snackBar,
+        'Please also provide a start image when using an end frame for interpolation.',
+      );
+      return;
+    }
+
     this.showErrorOverlay = true;
 
     const hasSourceAssets = this.startImageAssetId || this.endImageAssetId;
