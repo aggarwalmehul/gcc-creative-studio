@@ -25,6 +25,7 @@ import {MediaItem} from '../../common/models/media-item.model';
 export enum GenerationModelEnum {
   // Music
   LYRIA_002 = 'lyria-002',
+  LYRIA_3_PRO = 'lyria-3-pro-preview', // LYRIA_3_PRO_UPGRADE_V1
 
   // Speech
   CHIRP_3 = 'chirp_3',
@@ -43,6 +44,12 @@ export interface CreateAudioDto {
   negativePrompt?: string;
   sampleCount?: number;
   seed?: number;
+
+  // Lyria 3 Pro Specific (LYRIA_3_PRO_UPGRADE_V1)
+  durationSeconds?: number;
+  lyrics?: string;
+  instrumental?: boolean;
+  referenceImageAssetIds?: number[];
 
   // TTS Specific
   languageCode?: LanguageEnum;

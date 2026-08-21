@@ -43,6 +43,9 @@ from src.common.base_dto import (
     MimeTypeEnum,
 )
 from src.common.schema.genai_model_setup import GenAIModelSetup
+from src.source_assets.repository.source_asset_repository import (
+    SourceAssetRepository,
+)  # LYRIA_3_PRO_UPGRADE_V1
 from src.common.schema.media_item_model import JobStatusEnum, MediaItemModel
 from src.common.storage_service import GcsService
 from src.config.config_service import config_service
@@ -324,6 +327,125 @@ def _process_audio_in_background(
                             results = await asyncio.gather(*tasks)
                             permanent_gcs_uris = [u for u in results if u]
 
+                        elif (
+                            request_dto.model in AudioService.MUSIC_MODELS_V3
+                        ):
+                            # LYRIA_3_PRO_UPGRADE_V1: Lyria 3 Pro uses the modern
+                            # Interactions API (same client/pattern as Gemini
+                            # Omni video), not the legacy Prediction API used
+                            # by Lyria 2. Genuinely new capabilities: duration
+                            # up to 184s, lyrics, instrumental mode, and
+                            # image-to-music -- all steered via the prompt
+                            # text plus optional reference images, per
+                            # Google's documented Lyria 3 Pro usage pattern.
+                            vertex_client = GenAIModelSetup.get_omni_client()
+
+                            # Resolve reference images (asset IDs -> GCS URIs),
+                            # mirroring the same pattern used for Veo/Omni
+                            # reference images in veo_service.py.
+                            lyria_reference_images: list[dict] = []
+                            if request_dto.reference_image_asset_ids:
+                                source_asset_repo = SourceAssetRepository(db)
+                                for (
+                                    asset_id
+                                ) in request_dto.reference_image_asset_ids:
+                                    asset = await source_asset_repo.get_by_id(
+                                        asset_id,
+                                    )
+                                    if asset and asset.gcs_uri:
+                                        lyria_reference_images.append(
+                                            {
+                                                "type": "image",
+                                                "mime_type": asset.mime_type,
+                                                "uri": asset.gcs_uri,
+                                            },
+                                        )
+
+                            # Compose the prompt: Lyria 3 Pro is almost
+                            # entirely prompt-driven (duration, instrumental
+                            # mode, and lyrics are all specified as natural
+                            # language instructions in the prompt text).
+                            composed_prompt_parts = [request_dto.prompt]
+                            if request_dto.duration_seconds:
+                                composed_prompt_parts.append(
+                                    f"Make this song approximately "
+                                    f"{request_dto.duration_seconds} seconds "
+                                    f"long.",
+                                )
+                            if request_dto.instrumental:
+                                composed_prompt_parts.append(
+                                    "This should be a purely instrumental "
+                                    "track with no vocals or lyrics.",
+                                )
+                            elif request_dto.lyrics:
+                                composed_prompt_parts.append(
+                                    f"Use the following lyrics for the "
+                                    f"vocals:\n{request_dto.lyrics}",
+                                )
+                            composed_prompt = " ".join(
+                                composed_prompt_parts,
+                            )
+
+                            lyria_inputs: list[dict] = [
+                                {"type": "text", "text": composed_prompt},
+                            ]
+                            lyria_inputs.extend(lyria_reference_images)
+
+                            async def generate_music_v3(
+                                index: int,
+                            ) -> str | None:
+                                try:
+                                    interaction = await asyncio.to_thread(
+                                        vertex_client.interactions.create,
+                                        model="lyria-3-pro-preview",
+                                        input=lyria_inputs,
+                                        stream=False,
+                                    )
+
+                                    generated_audio = getattr(
+                                        interaction, "output_audio", None,
+                                    )
+                                    if (
+                                        not generated_audio
+                                        or not generated_audio.data
+                                    ):
+                                        worker_logger.error(
+                                            "Lyria 3 Pro returned no audio "
+                                            "output.",
+                                        )
+                                        return None
+
+                                    audio_bytes = base64.b64decode(
+                                        generated_audio.data,
+                                    )
+                                    file_name = (
+                                        f"lyria3pro_music_{media_item_id}_"
+                                        f"{uid_short}_{index}.mp3"
+                                    )
+                                    return gcs_service.store_to_gcs(
+                                        folder="lyria_audio",
+                                        file_name=file_name,
+                                        mime_type=MimeTypeEnum.AUDIO_MP3,
+                                        contents=audio_bytes,
+                                        decode=False,
+                                    )
+                                except Exception as e:
+                                    worker_logger.error(
+                                        f"Lyria 3 Pro generation error: {e}",
+                                    )
+                                    return None
+
+                            # Lyria 3 Pro returns exactly one clip per API
+                            # call (unlike Lyria 2's single-call sample_count),
+                            # so we issue sample_count separate calls in
+                            # parallel, same asyncio.gather pattern as above.
+                            tasks = [
+                                generate_music_v3(i)
+                                for i in range(request_dto.sample_count)
+                            ]
+                            results = await asyncio.gather(*tasks)
+                            permanent_gcs_uris = [u for u in results if u]
+
                         else:
                             raise ValueError(
                                 f"Model {request_dto.model} is not supported."
@@ -379,6 +501,9 @@ class AudioService:
     MUSIC_MODELS = {
         GenerationModelEnum.LYRIA_002,
     }
+    MUSIC_MODELS_V3 = {  # LYRIA_3_PRO_UPGRADE_V1
+        GenerationModelEnum.LYRIA_3_PRO,
+    }
 
     def __init__(
         self,
@@ -395,10 +520,34 @@ class AudioService:
         executor: ThreadPoolExecutor,
     ) -> MediaItemResponse:
 
+        # LYRIA_3_PRO_UPGRADE_V1: stash Lyria 3 Pro-specific fields in the
+        # generic raw_data JSONB column (no schema migration needed), same
+        # pattern already used for VEO concatenation inputs and brand
+        # guideline interaction metadata elsewhere in the codebase.
+        is_lyria_3_pro = (
+            request_dto.model == GenerationModelEnum.LYRIA_3_PRO
+        )
+        lyria_3_pro_raw_data = (
+            {
+                "duration_seconds": request_dto.duration_seconds,
+                "lyrics": request_dto.lyrics,
+                "instrumental": request_dto.instrumental,
+                "reference_image_asset_ids": (
+                    request_dto.reference_image_asset_ids
+                ),
+            }
+            if is_lyria_3_pro
+            else {}
+        )
+
         media_post_to_save = MediaItemModel(
             user_email=user.email,
             user_id=user.id,
-            mime_type=MimeTypeEnum.AUDIO_WAV,
+            mime_type=(
+                MimeTypeEnum.AUDIO_MP3
+                if is_lyria_3_pro
+                else MimeTypeEnum.AUDIO_WAV
+            ),
             model=request_dto.model,
             aspect_ratio=AspectRatioEnum.RATIO_16_9,
             workspace_id=request_dto.workspace_id,
@@ -411,6 +560,7 @@ class AudioService:
             language_code=request_dto.language_code,
             seed=request_dto.seed,
             gcs_uris=[],
+            raw_data=lyria_3_pro_raw_data,
         )
         saved_item = await self.media_repo.create(media_post_to_save)
 

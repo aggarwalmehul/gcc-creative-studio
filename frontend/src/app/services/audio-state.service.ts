@@ -25,6 +25,10 @@ export interface AudioState {
   sampleCount: number;
   selectedLanguage: string;
   selectedVoice: string;
+  // LYRIA_3_PRO_UPGRADE_V1
+  durationSeconds?: number;
+  lyrics?: string;
+  instrumental?: boolean;
 }
 
 @Injectable({
@@ -41,6 +45,9 @@ export class AudioStateService {
     sampleCount: 1,
     selectedLanguage: 'en-US',
     selectedVoice: 'Puck',
+    durationSeconds: undefined,
+    lyrics: '',
+    instrumental: false,
   };
 
   getState(): AudioState {

@@ -70,6 +70,7 @@ class GenerationModelEnum(str, Enum):
     VEO_3_QUALITY_PREVIEW = "veo-3.0-generate-preview"
     # Audio-Specific Models
     LYRIA_002 = "lyria-002"
+    LYRIA_3_PRO = "lyria-3-pro-preview"  # LYRIA_3_PRO_UPGRADE_V1
     CHIRP_3 = "chirp_3"
     GEMINI_2_5_FLASH_TTS = "gemini-2.5-flash-tts"
     GEMINI_2_5_FLASH_LITE_PREVIEW_TTS = "gemini-2.5-flash-lite-preview-tts"

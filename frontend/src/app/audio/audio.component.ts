@@ -28,6 +28,11 @@ import {DomSanitizer, SafeResourceUrl} from '@angular/platform-browser';
 import {WorkspaceStateService} from '../services/workspace/workspace-state.service';
 import {JobStatus, MediaItem} from '../common/models/media-item.model';
 import {AddVoiceDialogComponent} from '../components/add-voice-dialog/add-voice-dialog.component';
+import {
+  ImageSelectorComponent,
+  MediaItemSelection,
+} from '../common/components/image-selector/image-selector.component';
+import {SourceAssetResponseDto} from '../common/services/source-asset.service'; // LYRIA_3_PRO_UPGRADE_V1
 import {MatIconRegistry} from '@angular/material/icon';
 import {LanguageEnum, VoiceEnum} from './audio.constants';
 import {SearchService} from '../services/search/search.service';
@@ -40,7 +45,7 @@ import {
 } from '../utils/handleMessageSnackbar';
 
 // UI Helper type
-type UiModelType = 'lyria' | 'chirp' | 'gemini-tts';
+type UiModelType = 'lyria' | 'lyria-3-pro' | 'chirp' | 'gemini-tts'; // LYRIA_3_PRO_UPGRADE_V1
 
 interface VoiceOption {
   id: VoiceEnum | string; // Allow string for custom cloned voices later
@@ -74,6 +79,12 @@ export class AudioComponent implements OnInit {
   negativePrompt = '';
   seed: number | undefined;
   sampleCount = 1;
+
+  // Lyria 3 Pro Specific Inputs (LYRIA_3_PRO_UPGRADE_V1)
+  durationSeconds: number | undefined;
+  lyrics = '';
+  instrumental = false;
+  referenceImageAssets: SourceAssetResponseDto[] = [];
 
   // TTS & Chirp Specific Inputs
   selectedLanguage: LanguageEnum = LanguageEnum.EN_US;
@@ -204,6 +215,10 @@ export class AudioComponent implements OnInit {
       sampleCount: this.sampleCount,
       selectedLanguage: this.selectedLanguage,
       selectedVoice: this.selectedVoice,
+      // LYRIA_3_PRO_UPGRADE_V1
+      durationSeconds: this.durationSeconds,
+      lyrics: this.lyrics,
+      instrumental: this.instrumental,
     });
   }
 
@@ -216,6 +231,53 @@ export class AudioComponent implements OnInit {
     this.sampleCount = state.sampleCount;
     this.selectedLanguage = state.selectedLanguage as LanguageEnum;
     this.selectedVoice = state.selectedVoice as VoiceEnum;
+    // LYRIA_3_PRO_UPGRADE_V1 (reference images intentionally NOT restored --
+    // asset selections don't persist across sessions, same as other
+    // ephemeral media selections elsewhere in the app)
+    this.durationSeconds = state.durationSeconds;
+    this.lyrics = state.lyrics || '';
+    this.instrumental = state.instrumental || false;
+  }
+
+  // LYRIA_3_PRO_UPGRADE_V1: opens the shared image-selector dialog in
+  // multi-select mode (up to 10 images, per Lyria 3 Pro's documented
+  // reference-image limit) for image-to-music generation.
+  openReferenceImageSelector(): void {
+    const dialogRef = this.dialog.open(ImageSelectorComponent, {
+      width: '90vw',
+      height: '80vh',
+      maxWidth: '90vw',
+      data: {
+        mimeType: 'image/*',
+        showFooter: true,
+        multiSelect: true,
+        maxSelection: 10 - this.referenceImageAssets.length,
+      },
+      panelClass: 'image-selector-dialog',
+    });
+
+    dialogRef
+      .afterClosed()
+      .subscribe(
+        (
+          result:
+            | (MediaItemSelection | SourceAssetResponseDto)[]
+            | undefined,
+        ) => {
+          if (!result || result.length === 0) return;
+          const newAssets = result as SourceAssetResponseDto[];
+          this.referenceImageAssets = [
+            ...this.referenceImageAssets,
+            ...newAssets,
+          ].slice(0, 10);
+        },
+      );
+  }
+
+  removeReferenceImage(index: number): void {
+    this.referenceImageAssets = this.referenceImageAssets.filter(
+      (_, i) => i !== index,
+    );
   }
 
   private setPath(url: string): SafeResourceUrl {
@@ -270,6 +332,9 @@ export class AudioComponent implements OnInit {
 
     if (this.selectedModel === 'lyria') {
       backendModel = GenerationModelEnum.LYRIA_002;
+    } else if (this.selectedModel === 'lyria-3-pro') {
+      // LYRIA_3_PRO_UPGRADE_V1
+      backendModel = GenerationModelEnum.LYRIA_3_PRO;
     } else if (this.selectedModel === 'chirp') {
       backendModel = GenerationModelEnum.CHIRP_3;
     } else {
@@ -277,24 +342,31 @@ export class AudioComponent implements OnInit {
       backendModel = GenerationModelEnum.GEMINI_2_5_FLASH_TTS;
     }
 
+    const isLyria3Pro = this.selectedModel === 'lyria-3-pro'; // LYRIA_3_PRO_UPGRADE_V1
+    const isAnyLyria = this.selectedModel === 'lyria' || isLyria3Pro;
+
     // 2. Construct the generic DTO
     const request: CreateAudioDto = {
       model: backendModel,
       prompt: this.prompt,
       workspaceId: activeWorkspaceId,
       // Optional fields (backend ignores them if not relevant to the specific model)
+      // Lyria 3 Pro does not support negative_prompt (backend rejects it).
       negativePrompt:
         this.selectedModel === 'lyria' ? this.negativePrompt : undefined,
       seed: this.selectedModel === 'lyria' ? this.seed : undefined,
       sampleCount: this.sampleCount,
       languageCode:
-        this.selectedModel !== 'lyria'
-          ? (this.selectedLanguage as LanguageEnum)
-          : undefined,
-      voiceName:
-        this.selectedModel !== 'lyria'
-          ? (this.selectedVoice as VoiceEnum)
-          : undefined,
+        !isAnyLyria ? (this.selectedLanguage as LanguageEnum) : undefined,
+      voiceName: !isAnyLyria ? (this.selectedVoice as VoiceEnum) : undefined,
+      // Lyria 3 Pro Specific (LYRIA_3_PRO_UPGRADE_V1)
+      durationSeconds: isLyria3Pro ? this.durationSeconds : undefined,
+      lyrics:
+        isLyria3Pro && !this.instrumental ? this.lyrics || undefined : undefined,
+      instrumental: isLyria3Pro ? this.instrumental : undefined,
+      referenceImageAssetIds: isLyria3Pro
+        ? this.referenceImageAssets.map(a => a.id).filter(id => id != null)
+        : undefined,
     };
 
     this.saveState();

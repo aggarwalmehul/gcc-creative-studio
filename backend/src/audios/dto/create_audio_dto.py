@@ -59,6 +59,31 @@ class CreateAudioDto(BaseDto):
         description="[Lyria Only] A seed for deterministic generation.",
     )
 
+    # --- Lyria 3 Pro Specific Fields (LYRIA_3_PRO_UPGRADE_V1) ---
+    duration_seconds: int | None = Field(
+        default=None,
+        ge=1,
+        le=184,
+        description="[Lyria 3 Pro Only] Desired song duration in seconds (max 184).",
+    )
+
+    lyrics: str | None = Field(
+        default=None,
+        max_length=5000,
+        description="[Lyria 3 Pro Only] User-provided lyrics to guide the track. Ignored if instrumental=True.",
+    )
+
+    instrumental: bool = Field(
+        default=False,
+        description="[Lyria 3 Pro Only] If true, generates an instrumental track with no vocals.",
+    )
+
+    reference_image_asset_ids: list[int] | None = Field(
+        default=None,
+        max_length=10,
+        description="[Lyria 3 Pro Only] Up to 10 SourceAsset IDs to use as visual inspiration (image-to-music).",
+    )
+
     # --- TTS / Chirp Specific Fields ---
     language_code: LanguageEnum | None = Field(
         default=LanguageEnum.EN_US,
@@ -77,6 +102,7 @@ class CreateAudioDto(BaseDto):
     ) -> GenerationModelEnum:
         allowed_audio_models = {
             GenerationModelEnum.LYRIA_002,
+            GenerationModelEnum.LYRIA_3_PRO,  # LYRIA_3_PRO_UPGRADE_V1
             GenerationModelEnum.CHIRP_3,
             GenerationModelEnum.GEMINI_2_5_FLASH_TTS,
             GenerationModelEnum.GEMINI_2_5_FLASH_LITE_PREVIEW_TTS,
@@ -102,5 +128,24 @@ class CreateAudioDto(BaseDto):
                 raise ValueError(
                     "language_code is required for Text-to-Speech models."
                 )
+
+        # LYRIA_3_PRO_UPGRADE_V1: Lyria 3 Pro does not support negative prompting,
+        # and its new fields (duration/lyrics/instrumental/reference images)
+        # only apply to Lyria 3 Pro, not Lyria 2 or TTS models.
+        is_lyria_3_pro = self.model == GenerationModelEnum.LYRIA_3_PRO
+        if is_lyria_3_pro and self.negative_prompt:
+            raise ValueError(
+                "negative_prompt is not supported by Lyria 3 Pro."
+            )
+        if not is_lyria_3_pro and (
+            self.duration_seconds
+            or self.lyrics
+            or self.instrumental
+            or self.reference_image_asset_ids
+        ):
+            raise ValueError(
+                "duration_seconds, lyrics, instrumental, and "
+                "reference_image_asset_ids are only supported by Lyria 3 Pro."
+            )
 
         return self
