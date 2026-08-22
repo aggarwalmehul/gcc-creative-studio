@@ -76,6 +76,7 @@ class GenerationModelEnum(str, Enum):
     GEMINI_2_5_FLASH_TTS = "gemini-2.5-flash-tts"
     GEMINI_2_5_FLASH_LITE_PREVIEW_TTS = "gemini-2.5-flash-lite-preview-tts"
     GEMINI_2_5_PRO_TTS = "gemini-2.5-pro-tts"
+    GEMINI_3_1_FLASH_TTS = "gemini-3.1-flash-tts-preview"  # GEMINI_3_1_TTS_UPGRADE_V1
 
     # Deprecated models (For old generations only, do not use)
     _DEPRECATED_VTO = "virtual-try-on-preview-08-04"

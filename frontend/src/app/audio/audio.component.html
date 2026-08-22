@@ -200,6 +200,16 @@
                     <textarea matInput [(ngModel)]="prompt" (ngModelChange)="saveState()" placeholder="Enter text to speak..." (keydown.control.enter)="generate()"></textarea>
                 </mat-form-field>
 
+                <!-- GEMINI_3_1_TTS_UPGRADE_V1: model picker, Gemini TTS only (Chirp has one model) -->
+                <mat-form-field appearance="outline" *ngIf="selectedModel === 'gemini-tts'">
+                    <mat-label>Model</mat-label>
+                    <mat-select [(ngModel)]="selectedGeminiTtsModel" (ngModelChange)="saveState()">
+                        <mat-option *ngFor="let m of geminiTtsModels" [value]="m.value">
+                            {{ m.label }}
+                        </mat-option>
+                    </mat-select>
+                </mat-form-field>
+
                 <mat-form-field appearance="outline">
                     <mat-label>Language</mat-label>
                     <mat-select [(ngModel)]="selectedLanguage" (ngModelChange)="saveState()">

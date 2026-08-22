@@ -100,6 +100,16 @@ export class AudioComponent implements OnInit {
   selectedLanguage: LanguageEnum = LanguageEnum.EN_US;
   selectedVoice: VoiceEnum | string = VoiceEnum.PUCK;
 
+  // GEMINI_3_1_TTS_UPGRADE_V1: lets the user pick which Gemini TTS model to use
+  // (Chirp only has one model, so no equivalent dropdown needed there).
+  selectedGeminiTtsModel: GenerationModelEnum = GenerationModelEnum.GEMINI_2_5_FLASH_TTS;
+  geminiTtsModels: {value: GenerationModelEnum; label: string}[] = [
+    {value: GenerationModelEnum.GEMINI_3_1_FLASH_TTS, label: 'Gemini 3.1 Flash TTS (Preview)'},
+    {value: GenerationModelEnum.GEMINI_2_5_PRO_TTS, label: 'Gemini 2.5 Pro TTS'},
+    {value: GenerationModelEnum.GEMINI_2_5_FLASH_TTS, label: 'Gemini 2.5 Flash TTS'},
+    {value: GenerationModelEnum.GEMINI_2_5_FLASH_LITE_PREVIEW_TTS, label: 'Gemini 2.5 Flash Lite TTS (Preview)'},
+  ];
+
   // --- Audio Player State ---
   @ViewChild('audioPlayer') audioPlayerRef!: ElementRef<HTMLAudioElement>;
   isPlaying = false;
@@ -406,8 +416,8 @@ export class AudioComponent implements OnInit {
     } else if (this.selectedModel === 'chirp') {
       backendModel = GenerationModelEnum.CHIRP_3;
     } else {
-      // Default to Flash TTS for Gemini selection
-      backendModel = GenerationModelEnum.GEMINI_2_5_FLASH_TTS;
+      // GEMINI_3_1_TTS_UPGRADE_V1: use whichever Gemini TTS model the user picked.
+      backendModel = this.selectedGeminiTtsModel;
     }
 
     const isLyria3Pro = this.selectedModel === 'lyria-3-pro'; // LYRIA_3_PRO_UPGRADE_V1
