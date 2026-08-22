@@ -298,19 +298,23 @@ export class AuthService {
   isLoggedIn() {
     if (!isPlatformBrowser(this.platformId)) return false;
 
-    // Check if the in-memory token is valid
-    const now = Date.now();
-    const isTokenValid = !!(
-      this.firebaseIdToken &&
-      this.firebaseTokenExpiry &&
-      this.firebaseTokenExpiry > now
-    );
-
-    if (!isTokenValid && this.router.url !== LOGIN_ROUTE) {
-      void this.router.navigate([LOGIN_ROUTE]);
-    }
-
-    return isTokenValid;
+    // AUTH_SESSION_TIMEOUT_FIX_V1: previously this checked whether the CACHED ID
+    // token's own 1-hour JWT expiry had passed, and treated that as
+    // "not logged in" -- which forced a hard logout (via
+    // getValidFirebaseToken$ -> AuthInterceptor) roughly every hour,
+    // even though Firebase's underlying refresh token was still valid
+    // and perfectly capable of silently refreshing the ID token.
+    // A Firebase session is considered active if either Firebase's own
+    // restored currentUser exists, or we have a previously-cached
+    // token. The short-lived ID token's staleness is a separate concern,
+    // handled by getValidFirebaseToken$() via a genuine refresh
+    // (currentUser.getIdToken(true)); only a REAL refresh failure there
+    // (e.g. a revoked refresh token) should result in logout.
+    // This method also no longer navigates as a side effect -- callers
+    // (route guards) already redirect to LOGIN_ROUTE themselves when
+    // this returns false, and having a boolean-returning check trigger
+    // navigation on every API call was part of the underlying bug.
+    return !!(this.auth.currentUser || this.firebaseIdToken);
   }
 
   private loadSessionFromStorage(): void {
