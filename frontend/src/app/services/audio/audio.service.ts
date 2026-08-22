@@ -26,6 +26,7 @@ export enum GenerationModelEnum {
   // Music
   LYRIA_002 = 'lyria-002',
   LYRIA_3_PRO = 'lyria-3-pro-preview', // LYRIA_3_PRO_UPGRADE_V1
+  LYRIA_3_CLIP = 'lyria-3-clip-preview', // LYRIA_3_CLIP_UPGRADE_V1
 
   // Speech
   CHIRP_3 = 'chirp_3',
@@ -50,6 +51,11 @@ export interface CreateAudioDto {
   lyrics?: string;
   instrumental?: boolean;
   referenceImageAssetIds?: number[];
+  referenceMediaItems?: {
+    mediaItemId: number;
+    mediaIndex: number;
+    role: string;
+  }[]; // LYRIA_REF_IMAGE_FIX_V1
 
   // TTS Specific
   languageCode?: LanguageEnum;

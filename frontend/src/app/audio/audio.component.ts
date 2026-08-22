@@ -45,7 +45,7 @@ import {
 } from '../utils/handleMessageSnackbar';
 
 // UI Helper type
-type UiModelType = 'lyria' | 'lyria-3-pro' | 'chirp' | 'gemini-tts'; // LYRIA_3_PRO_UPGRADE_V1
+type UiModelType = 'lyria' | 'lyria-3-pro' | 'lyria-3-clip' | 'chirp' | 'gemini-tts'; // LYRIA_3_CLIP_UPGRADE_V1
 
 interface VoiceOption {
   id: VoiceEnum | string; // Allow string for custom cloned voices later
@@ -56,6 +56,16 @@ interface VoiceOption {
 interface LanguageOption {
   code: LanguageEnum;
   name: string;
+}
+
+// LYRIA_REF_IMAGE_FIX_V1: normalized reference-image shape used by the Lyria 3
+// Pro image-to-music feature, regardless of which underlying selector
+// result (SourceAssetResponseDto or MediaItemSelection) it came from.
+interface ReferenceImageRef {
+  kind: 'source_asset' | 'media_item';
+  id: number;
+  mediaIndex?: number; // only present for kind === 'media_item'
+  thumbnailUrl: string;
 }
 
 @Component({
@@ -84,7 +94,7 @@ export class AudioComponent implements OnInit {
   durationSeconds: number | undefined;
   lyrics = '';
   instrumental = false;
-  referenceImageAssets: SourceAssetResponseDto[] = [];
+  referenceImageAssets: ReferenceImageRef[] = [];  // LYRIA_REF_IMAGE_FIX_V1
 
   // TTS & Chirp Specific Inputs
   selectedLanguage: LanguageEnum = LanguageEnum.EN_US;
@@ -239,9 +249,14 @@ export class AudioComponent implements OnInit {
     this.instrumental = state.instrumental || false;
   }
 
-  // LYRIA_3_PRO_UPGRADE_V1: opens the shared image-selector dialog in
-  // multi-select mode (up to 10 images, per Lyria 3 Pro's documented
-  // reference-image limit) for image-to-music generation.
+  // LYRIA_REF_IMAGE_FIX_V1: the shared image-selector dialog can return TWO
+  // structurally different shapes -- a flat SourceAssetResponseDto (for
+  // directly-uploaded images) or a nested MediaItemSelection (for images
+  // picked from the generation gallery, e.g. {mediaItem: {...}, selectedIndex}).
+  // Both are normalized here into a single display-friendly shape so the
+  // template can render either kind's thumbnail correctly, and each is
+  // tagged with its source kind so generate() can route it to the correct
+  // backend field (reference_image_asset_ids vs reference_media_items).
   openReferenceImageSelector(): void {
     const dialogRef = this.dialog.open(ImageSelectorComponent, {
       width: '90vw',
@@ -262,16 +277,66 @@ export class AudioComponent implements OnInit {
         (
           result:
             | (MediaItemSelection | SourceAssetResponseDto)[]
+            | MediaItemSelection
+            | SourceAssetResponseDto
             | undefined,
         ) => {
-          if (!result || result.length === 0) return;
-          const newAssets = result as SourceAssetResponseDto[];
+          if (!result) return;
+          // LYRIA_REF_IMAGE_MULTISHAPE_FIX_V1: the shared image-selector dialog does NOT
+          // consistently return an array even when multiSelect is true --
+          // direct file uploads/crops always close with a single bare
+          // object (see uploadAsset/cropperDialogRef subscribers in
+          // ImageSelectorComponent), which previously crashed here with
+          // "t.map is not a function". Normalize to an array first.
+          const resultArray = Array.isArray(result) ? result : [result];
+          if (resultArray.length === 0) return;
+          const normalized: ReferenceImageRef[] = resultArray
+            .map(item => this.normalizeReferenceSelection(item))
+            .filter((r): r is ReferenceImageRef => r !== null);
           this.referenceImageAssets = [
             ...this.referenceImageAssets,
-            ...newAssets,
+            ...normalized,
           ].slice(0, 10);
         },
       );
+  }
+
+  // LYRIA_REF_IMAGE_FIX_V1: normalizes either selector result shape into a
+  // common { kind, id, mediaIndex?, thumbnailUrl } shape used for display
+  // and for building the correct backend request fields.
+  private normalizeReferenceSelection(
+    item: MediaItemSelection | SourceAssetResponseDto,
+  ): ReferenceImageRef | null {
+    if ('mediaItem' in item) {
+      // Gallery selection: nested shape, arrays for URLs.
+      const mediaItem = item.mediaItem as unknown as {
+        id: number;
+        presignedThumbnailUrls?: string[];
+        presignedUrls?: string[];
+      };
+      const thumbnailUrl =
+        mediaItem.presignedThumbnailUrls?.[item.selectedIndex] ||
+        mediaItem.presignedUrls?.[item.selectedIndex] ||
+        mediaItem.presignedThumbnailUrls?.[0] ||
+        mediaItem.presignedUrls?.[0] ||
+        '';
+      if (!mediaItem.id || !thumbnailUrl) return null;
+      return {
+        kind: 'media_item',
+        id: mediaItem.id,
+        mediaIndex: item.selectedIndex,
+        thumbnailUrl,
+      };
+    }
+    // Directly-uploaded source asset: flat shape, singular URL fields.
+    const asset = item as SourceAssetResponseDto;
+    const thumbnailUrl = asset.presignedThumbnailUrl || asset.presignedUrl;
+    if (!asset.id || !thumbnailUrl) return null;
+    return {
+      kind: 'source_asset',
+      id: asset.id,
+      thumbnailUrl,
+    };
   }
 
   removeReferenceImage(index: number): void {
@@ -335,6 +400,9 @@ export class AudioComponent implements OnInit {
     } else if (this.selectedModel === 'lyria-3-pro') {
       // LYRIA_3_PRO_UPGRADE_V1
       backendModel = GenerationModelEnum.LYRIA_3_PRO;
+    } else if (this.selectedModel === 'lyria-3-clip') {
+      // LYRIA_3_CLIP_UPGRADE_V1
+      backendModel = GenerationModelEnum.LYRIA_3_CLIP;
     } else if (this.selectedModel === 'chirp') {
       backendModel = GenerationModelEnum.CHIRP_3;
     } else {
@@ -343,7 +411,9 @@ export class AudioComponent implements OnInit {
     }
 
     const isLyria3Pro = this.selectedModel === 'lyria-3-pro'; // LYRIA_3_PRO_UPGRADE_V1
-    const isAnyLyria = this.selectedModel === 'lyria' || isLyria3Pro;
+    const isLyria3Clip = this.selectedModel === 'lyria-3-clip'; // LYRIA_3_CLIP_UPGRADE_V1
+    const isLyria3 = isLyria3Pro || isLyria3Clip;
+    const isAnyLyria = this.selectedModel === 'lyria' || isLyria3;
 
     // 2. Construct the generic DTO
     const request: CreateAudioDto = {
@@ -360,12 +430,28 @@ export class AudioComponent implements OnInit {
         !isAnyLyria ? (this.selectedLanguage as LanguageEnum) : undefined,
       voiceName: !isAnyLyria ? (this.selectedVoice as VoiceEnum) : undefined,
       // Lyria 3 Pro Specific (LYRIA_3_PRO_UPGRADE_V1)
+      // LYRIA_3_CLIP_UPGRADE_V1: duration is Pro-only (Clip always ~30s per
+      // Google's docs), but lyrics/instrumental/reference images are
+      // supported by both Lyria 3 variants.
       durationSeconds: isLyria3Pro ? this.durationSeconds : undefined,
       lyrics:
-        isLyria3Pro && !this.instrumental ? this.lyrics || undefined : undefined,
-      instrumental: isLyria3Pro ? this.instrumental : undefined,
-      referenceImageAssetIds: isLyria3Pro
-        ? this.referenceImageAssets.map(a => a.id).filter(id => id != null)
+        isLyria3 && !this.instrumental ? this.lyrics || undefined : undefined,
+      instrumental: isLyria3 ? this.instrumental : undefined,
+      // LYRIA_REF_IMAGE_FIX_V1: split combined reference-image list by source
+      // kind into the two backend fields it actually expects.
+      referenceImageAssetIds: isLyria3
+        ? this.referenceImageAssets
+            .filter(r => r.kind === 'source_asset')
+            .map(r => r.id)
+        : undefined,
+      referenceMediaItems: isLyria3
+        ? this.referenceImageAssets
+            .filter(r => r.kind === 'media_item')
+            .map(r => ({
+              mediaItemId: r.id,
+              mediaIndex: r.mediaIndex ?? 0,
+              role: 'music_reference',
+            }))
         : undefined,
     };
 

@@ -210,6 +210,22 @@
     padding: 0.5rem 3rem;
     font-size: 1.1rem;
     height: 48px;
+    // LYRIA_3_CLIP_UPGRADE_V1: explicit colors so the button is visible against
+    // the dark glassmorphism panel instead of blending into it.
+    background-color: #4285f4 !important;
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+
+    &:hover:not(:disabled) {
+        background-color: #5a95f5 !important;
+    }
+
+    &:disabled {
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        color: rgba(255, 255, 255, 0.4) !important;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
 }
 
 .add-voice-option {
@@ -253,14 +269,34 @@
     }
 }
 
+// LYRIA_ROW_MERGE_FIX_V1: merged row layout (Duration/Results/Lyrics/Instrumental
+// on one line) + suppress native number-input spin-button arrows, which
+// were the likely cause of a stray floating arrow box near Duration.
 .l3p-row-inline {
     align-items: center;
     flex-wrap: wrap;
+
+    input[type="number"] {
+        -moz-appearance: textfield;
+
+        &::-webkit-outer-spin-button,
+        &::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    }
 }
 
-.l3p-prompt,
-.l3p-lyrics {
+.l3p-prompt {
     flex: 1;
+}
+
+// Lyrics now lives inline in the merged row (as a single-line input,
+// not a full-width textarea), so it needs a real basis instead of
+// competing for 100% width against Duration/Results/Instrumental.
+.l3p-lyrics {
+    flex: 1 1 220px;
+    min-width: 160px;
 }
 
 .l3p-duration {

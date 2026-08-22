@@ -95,6 +95,8 @@
                 <mat-button-toggle value="lyria">Lyria (Music)</mat-button-toggle>
                 <mat-button-toggle value="lyria-3-pro">Lyria 3 Pro (Music)</mat-button-toggle>
                 <!-- LYRIA_3_PRO_UPGRADE_V1 -->
+                <mat-button-toggle value="lyria-3-clip">Lyria 3 Clip (Music)</mat-button-toggle>
+                <!-- LYRIA_3_CLIP_UPGRADE_V1 -->
                 <mat-button-toggle value="chirp">Chirp TTS</mat-button-toggle>
                 <mat-button-toggle value="gemini-tts">Gemini TTS</mat-button-toggle>
             </mat-button-toggle-group>
@@ -131,7 +133,7 @@
             </ng-container>
 
             <!-- LYRIA_3_PRO_UI_LAYOUT_FIX_V2: Lyria 3 Pro specific fields, multi-row layout -->
-            <ng-container *ngIf="selectedModel === 'lyria-3-pro'">
+            <ng-container *ngIf="selectedModel === 'lyria-3-pro' || selectedModel === 'lyria-3-clip'"> <!-- LYRIA_3_CLIP_UPGRADE_V1 -->
               <div class="lyria3pro-grid">
                 <div class="l3p-row">
                     <mat-form-field appearance="outline" class="l3p-prompt">
@@ -140,8 +142,9 @@
                     </mat-form-field>
                 </div>
 
+                <!-- LYRIA_ROW_MERGE_FIX_V1: merged Duration/Results/Lyrics/Instrumental into one row -->
                 <div class="l3p-row l3p-row-inline">
-                    <mat-form-field appearance="outline" class="l3p-duration">
+                    <mat-form-field appearance="outline" class="l3p-duration" *ngIf="selectedModel === 'lyria-3-pro'">
                         <mat-label>Duration (sec, max 184)</mat-label>
                         <input matInput type="number" min="1" max="184" [(ngModel)]="durationSeconds" (ngModelChange)="saveState()" placeholder="e.g. 90">
                     </mat-form-field>
@@ -155,6 +158,11 @@
                         </mat-select>
                     </mat-form-field>
 
+                    <mat-form-field appearance="outline" class="l3p-lyrics" *ngIf="!instrumental">
+                        <mat-label>Lyrics (optional)</mat-label>
+                        <input matInput [(ngModel)]="lyrics" (ngModelChange)="saveState()" placeholder="Optional, or let Lyria write them">
+                    </mat-form-field>
+
                     <div class="l3p-instrumental-toggle">
                         <mat-slide-toggle [(ngModel)]="instrumental" (ngModelChange)="saveState()">
                             Instrumental (no vocals)
@@ -162,19 +170,13 @@
                     </div>
                 </div>
 
-                <div class="l3p-row" *ngIf="!instrumental">
-                    <mat-form-field appearance="outline" class="l3p-lyrics">
-                        <mat-label>Lyrics (optional)</mat-label>
-                        <textarea matInput [(ngModel)]="lyrics" (ngModelChange)="saveState()" placeholder="Provide your own lyrics, or leave blank to let Lyria write them..."></textarea>
-                    </mat-form-field>
-                </div>
-
                 <div class="l3p-row">
                     <div class="reference-images-section">
                         <label class="reference-images-label">Reference Images (optional, up to 10)</label>
                         <div class="reference-images-list">
+                            <!-- LYRIA_REF_IMAGE_FIX_V1 -->
                             <div class="reference-image-thumb" *ngFor="let asset of referenceImageAssets; let i = index">
-                                <img [src]="asset.presignedThumbnailUrl || asset.presignedUrl" alt="Reference image">
+                                <img [src]="asset.thumbnailUrl" alt="Reference image">
                                 <button mat-icon-button (click)="removeReferenceImage(i)" aria-label="Remove reference image">
                                     <mat-icon>close</mat-icon>
                                 </button>
@@ -189,7 +191,10 @@
               </div>
             </ng-container>
 
-            <ng-container *ngIf="selectedModel !== 'lyria' && selectedModel !== 'lyria-3-pro'">
+            <!-- LYRIA_3_CLIP_TTS_LEAK_FIX_V1: must also exclude lyria-3-clip, otherwise the
+                 TTS/Gemini section renders simultaneously alongside the Lyria 3
+                 section whenever Lyria 3 Clip is selected. -->
+            <ng-container *ngIf="selectedModel !== 'lyria' && selectedModel !== 'lyria-3-pro' && selectedModel !== 'lyria-3-clip'">
                 <mat-form-field appearance="outline" class="large-field">
                     <mat-label>Text to Speech</mat-label>
                     <textarea matInput [(ngModel)]="prompt" (ngModelChange)="saveState()" placeholder="Enter text to speak..." (keydown.control.enter)="generate()"></textarea>

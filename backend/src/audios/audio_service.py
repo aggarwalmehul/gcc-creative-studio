@@ -340,9 +340,20 @@ def _process_audio_in_background(
                             # Google's documented Lyria 3 Pro usage pattern.
                             vertex_client = GenAIModelSetup.get_omni_client()
 
-                            # Resolve reference images (asset IDs -> GCS URIs),
-                            # mirroring the same pattern used for Veo/Omni
-                            # reference images in veo_service.py.
+                            # Resolve reference images. Two sources are
+                            # supported, mirroring the exact dual-path
+                            # pattern already used for Veo/Omni reference
+                            # images in veo_service.py:
+                            #   1. reference_image_asset_ids -> directly
+                            #      uploaded SourceAsset rows.
+                            #   2. reference_media_items -> previously
+                            #      generated gallery MediaItem rows
+                            #      (resolved via media_item_id + media_index
+                            #      into one of that item's gcs_uris).
+                            # LYRIA_REF_IMAGE_FIX_V1: the image-selector dialog
+                            # can return either kind, so both must be
+                            # resolved correctly rather than assuming a
+                            # single flat SourceAsset-only shape.
                             lyria_reference_images: list[dict] = []
                             if request_dto.reference_image_asset_ids:
                                 source_asset_repo = SourceAssetRepository(db)
@@ -358,6 +369,29 @@ def _process_audio_in_background(
                                                 "type": "image",
                                                 "mime_type": asset.mime_type,
                                                 "uri": asset.gcs_uri,
+                                            },
+                                        )
+                            if request_dto.reference_media_items:
+                                for (
+                                    ref_item
+                                ) in request_dto.reference_media_items:
+                                    parent_item = await media_repo.get_by_id(
+                                        ref_item.media_item_id,
+                                    )
+                                    if (
+                                        parent_item
+                                        and parent_item.gcs_uris
+                                        and 0
+                                        <= ref_item.media_index
+                                        < len(parent_item.gcs_uris)
+                                    ):
+                                        lyria_reference_images.append(
+                                            {
+                                                "type": "image",
+                                                "mime_type": parent_item.mime_type,
+                                                "uri": parent_item.gcs_uris[
+                                                    ref_item.media_index
+                                                ],
                                             },
                                         )
 
@@ -397,7 +431,11 @@ def _process_audio_in_background(
                                 try:
                                     interaction = await asyncio.to_thread(
                                         vertex_client.interactions.create,
-                                        model="lyria-3-pro-preview",
+                                        # LYRIA_3_CLIP_UPGRADE_V1: use whichever
+                                        # Lyria 3 variant was requested
+                                        # (Pro or Clip) instead of hardcoding
+                                        # Pro -- both share this code path.
+                                        model=request_dto.model.value,
                                         input=lyria_inputs,
                                         stream=False,
                                     )
@@ -503,6 +541,7 @@ class AudioService:
     }
     MUSIC_MODELS_V3 = {  # LYRIA_3_PRO_UPGRADE_V1
         GenerationModelEnum.LYRIA_3_PRO,
+        GenerationModelEnum.LYRIA_3_CLIP,  # LYRIA_3_CLIP_UPGRADE_V1
     }
 
     def __init__(

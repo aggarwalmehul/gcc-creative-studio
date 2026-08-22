@@ -71,6 +71,7 @@ class GenerationModelEnum(str, Enum):
     # Audio-Specific Models
     LYRIA_002 = "lyria-002"
     LYRIA_3_PRO = "lyria-3-pro-preview"  # LYRIA_3_PRO_UPGRADE_V1
+    LYRIA_3_CLIP = "lyria-3-clip-preview"  # LYRIA_3_CLIP_UPGRADE_V1
     CHIRP_3 = "chirp_3"
     GEMINI_2_5_FLASH_TTS = "gemini-2.5-flash-tts"
     GEMINI_2_5_FLASH_LITE_PREVIEW_TTS = "gemini-2.5-flash-lite-preview-tts"

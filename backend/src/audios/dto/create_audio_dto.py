@@ -19,6 +19,9 @@ from pydantic import Field, field_validator, model_validator
 
 from src.audios.audio_constants import LanguageEnum, VoiceEnum
 from src.common.base_dto import BaseDto, GenerationModelEnum
+from src.common.schema.media_item_model import (
+    SourceMediaItemLink,
+)  # LYRIA_REF_IMAGE_FIX_V1
 
 
 class CreateAudioDto(BaseDto):
@@ -84,6 +87,12 @@ class CreateAudioDto(BaseDto):
         description="[Lyria 3 Pro Only] Up to 10 SourceAsset IDs to use as visual inspiration (image-to-music).",
     )
 
+    reference_media_items: list[SourceMediaItemLink] | None = Field(
+        default=None,
+        max_length=10,
+        description="[Lyria 3 Pro Only] Up to 10 gallery MediaItem references (with index + role) to use as visual inspiration (image-to-music). Use this for images previously generated in the app; use reference_image_asset_ids for directly-uploaded source assets.",  # LYRIA_REF_IMAGE_FIX_V1
+    )
+
     # --- TTS / Chirp Specific Fields ---
     language_code: LanguageEnum | None = Field(
         default=LanguageEnum.EN_US,
@@ -103,6 +112,7 @@ class CreateAudioDto(BaseDto):
         allowed_audio_models = {
             GenerationModelEnum.LYRIA_002,
             GenerationModelEnum.LYRIA_3_PRO,  # LYRIA_3_PRO_UPGRADE_V1
+            GenerationModelEnum.LYRIA_3_CLIP,  # LYRIA_3_CLIP_UPGRADE_V1
             GenerationModelEnum.CHIRP_3,
             GenerationModelEnum.GEMINI_2_5_FLASH_TTS,
             GenerationModelEnum.GEMINI_2_5_FLASH_LITE_PREVIEW_TTS,
@@ -132,20 +142,38 @@ class CreateAudioDto(BaseDto):
         # LYRIA_3_PRO_UPGRADE_V1: Lyria 3 Pro does not support negative prompting,
         # and its new fields (duration/lyrics/instrumental/reference images)
         # only apply to Lyria 3 Pro, not Lyria 2 or TTS models.
-        is_lyria_3_pro = self.model == GenerationModelEnum.LYRIA_3_PRO
-        if is_lyria_3_pro and self.negative_prompt:
+        # LYRIA_3_CLIP_UPGRADE_V1: Lyria 3 Clip shares the same field set as
+        # Lyria 3 Pro (lyrics, instrumental, reference images), it just
+        # always produces a fixed ~30s clip regardless of duration_seconds.
+        is_lyria_3 = self.model in (
+            GenerationModelEnum.LYRIA_3_PRO,
+            GenerationModelEnum.LYRIA_3_CLIP,
+        )
+        if is_lyria_3 and self.negative_prompt:
             raise ValueError(
-                "negative_prompt is not supported by Lyria 3 Pro."
+                "negative_prompt is not supported by Lyria 3 Pro or Lyria 3 Clip."
             )
-        if not is_lyria_3_pro and (
+        if not is_lyria_3 and (
             self.duration_seconds
             or self.lyrics
             or self.instrumental
             or self.reference_image_asset_ids
+            or self.reference_media_items
         ):
             raise ValueError(
-                "duration_seconds, lyrics, instrumental, and "
-                "reference_image_asset_ids are only supported by Lyria 3 Pro."
+                "duration_seconds, lyrics, instrumental, "
+                "reference_image_asset_ids, and reference_media_items are "
+                "only supported by Lyria 3 Pro or Lyria 3 Clip."
+            )
+
+        total_refs = len(self.reference_image_asset_ids or []) + len(
+            self.reference_media_items or [],
+        )
+        if total_refs > 10:
+            raise ValueError(
+                "A maximum of 10 reference images total is allowed "
+                "(across reference_image_asset_ids and "
+                "reference_media_items combined).",
             )
 
         return self
