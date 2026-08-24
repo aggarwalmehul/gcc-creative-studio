@@ -43,6 +43,7 @@ from src.common.base_dto import (
     MimeTypeEnum,
 )
 from src.common.schema.genai_model_setup import GenAIModelSetup
+from src.common.token_logger import log_tokens  # TOKEN_LOGGING_AUDIT_FIX_V1
 from src.source_assets.repository.source_asset_repository import (
     SourceAssetRepository,
 )  # LYRIA_3_PRO_UPGRADE_V1
@@ -142,6 +143,15 @@ def _process_audio_in_background(
                                             ),
                                         ),
                                     )
+                                    # TOKEN_LOGGING_AUDIT_FIX_V1: Gemini TTS
+                                    # generation was never logging token
+                                    # usage at all.
+                                    log_tokens(
+                                        "creative-studio",
+                                        request_dto.model.value,
+                                        response,
+                                    )
+
                                     if (
                                         not response.candidates
                                         or not response.candidates[0].content
@@ -438,6 +448,15 @@ def _process_audio_in_background(
                                         model=request_dto.model.value,
                                         input=lyria_inputs,
                                         stream=False,
+                                    )
+
+                                    # TOKEN_LOGGING_AUDIT_FIX_V1: Lyria 3
+                                    # Pro/Clip generation was never logging
+                                    # token usage at all.
+                                    log_tokens(
+                                        "creative-studio",
+                                        request_dto.model.value,
+                                        interaction,
                                     )
 
                                     generated_audio = getattr(

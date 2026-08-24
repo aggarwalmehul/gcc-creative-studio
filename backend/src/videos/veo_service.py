@@ -36,6 +36,7 @@ from src.common.base_dto import (
 )
 from src.common.media_utils import concatenate_videos, generate_thumbnail
 from src.common.schema.genai_model_setup import GenAIModelSetup
+from src.common.token_logger import log_tokens  # TOKEN_LOGGING_AUDIT_FIX_V1
 from src.common.schema.media_item_model import (
     AssetRoleEnum,
     JobStatusEnum,
@@ -677,6 +678,14 @@ def _process_video_in_background(
                                     raise last_err or Exception(
                                         "Failed to generate video after multiple attempts."
                                     )
+
+                                # TOKEN_LOGGING_AUDIT_FIX_V1: Omni video generation was
+                                # never logging token usage at all.
+                                log_tokens(
+                                    "creative-studio",
+                                    model_name_for_api,
+                                    interaction,
+                                )
 
                                 interaction_id = interaction.id
                                 contents = []

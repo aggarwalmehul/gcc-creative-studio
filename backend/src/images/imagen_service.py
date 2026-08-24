@@ -40,6 +40,7 @@ from src.common.base_dto import (
 )
 from src.common.media_utils import generate_image_thumbnail_from_gcs
 from src.common.schema.genai_model_setup import GenAIModelSetup
+from src.common.token_logger import log_tokens  # TOKEN_LOGGING_AUDIT_FIX_V1
 from src.common.schema.media_item_model import (
     AssetRoleEnum,
     JobStatusEnum,
@@ -530,6 +531,10 @@ def gemini_generate_image(
                     config=generate_content_config,
                 )
             )
+
+            # TOKEN_LOGGING_AUDIT_FIX_V1: Gemini image-to-image (via Imagen service)
+            # generation was never logging token usage at all.
+            log_tokens("creative-studio", model, response)
 
             grounding_metadata = None
 
