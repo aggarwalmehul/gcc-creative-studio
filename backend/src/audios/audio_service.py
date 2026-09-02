@@ -548,10 +548,11 @@ def _process_audio_in_background(
 
 class AudioService:
     GEMINI_MODELS = {
+        GenerationModelEnum.GEMINI_3_1_PRO_TTS,  # GEMINI_3_1_PRO_TTS_DEFAULT_V1
+        GenerationModelEnum.GEMINI_3_1_FLASH_TTS,  # GEMINI_3_1_TTS_UPGRADE_V1
+        GenerationModelEnum.GEMINI_2_5_PRO_TTS,
         GenerationModelEnum.GEMINI_2_5_FLASH_TTS,
         GenerationModelEnum.GEMINI_2_5_FLASH_LITE_PREVIEW_TTS,
-        GenerationModelEnum.GEMINI_2_5_PRO_TTS,
-        GenerationModelEnum.GEMINI_3_1_FLASH_TTS,  # GEMINI_3_1_TTS_UPGRADE_V1
     }
     TTS_MODELS = {
         GenerationModelEnum.CHIRP_3,

@@ -30,10 +30,11 @@ export enum GenerationModelEnum {
 
   // Speech
   CHIRP_3 = 'chirp_3',
+  GEMINI_3_1_PRO_TTS = 'gemini-3.1-pro-tts-preview', // GEMINI_3_1_PRO_TTS_DEFAULT_V1
+  GEMINI_3_1_FLASH_TTS = 'gemini-3.1-flash-tts-preview', // GEMINI_3_1_TTS_UPGRADE_V1
+  GEMINI_2_5_PRO_TTS = 'gemini-2.5-pro-tts',
   GEMINI_2_5_FLASH_TTS = 'gemini-2.5-flash-tts',
   GEMINI_2_5_FLASH_LITE_PREVIEW_TTS = 'gemini-2.5-flash-lite-preview-tts',
-  GEMINI_2_5_PRO_TTS = 'gemini-2.5-pro-tts',
-  GEMINI_3_1_FLASH_TTS = 'gemini-3.1-flash-tts-preview', // GEMINI_3_1_TTS_UPGRADE_V1
 }
 
 // 2. Define the Generic Request DTO

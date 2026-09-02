@@ -114,38 +114,14 @@ export class AuthService {
    * 2. If expired or missing, attempts a silent refresh.
    * 3. If silent refresh fails, it emits an error, signaling a required re-login.
    */
+  /**
+   * @deprecated Not called anywhere in the app (the AuthInterceptor uses
+   * getValidIdentityPlatformToken$ instead). Kept as a thin delegate, rather
+   * than removed outright, so the two can never silently drift apart again
+   * the way they previously did -- see TOKEN_REFRESH_FIX_V1.
+   */
   getValidFirebaseToken$(): Observable<string> {
-    // First, check our own session info which is loaded from localStorage.
-    // This is synchronous and tells us if we have a valid, non-expired token.
-    if (!this.isLoggedIn()) {
-      return throwError(
-        () => new Error('User session is not valid or has expired. 1'),
-      );
-    }
-
-    // If we have a valid session, check if the Firebase Auth instance is ready.
-    const currentUser = this.auth.currentUser;
-    if (currentUser) {
-      // Ideal case: Auth is ready, so we can force a token refresh to ensure it's fresh.
-      return from(currentUser.getIdToken(true)).pipe(
-        tap((token: string) => {
-          // Update the in-memory cache and localStorage with the refreshed token info.
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          const expiry = payload.exp * 1000;
-
-          this.firebaseIdToken = token;
-          this.firebaseTokenExpiry = expiry;
-
-          const session: FirebaseSession = {token, expiry};
-          localStorage.setItem(FIREBASE_SESSION_KEY, JSON.stringify(session));
-        }),
-      );
-    }
-
-    // Fallback case: The Firebase Auth instance is not yet initialized, but we
-    // have a valid token from localStorage. We can use this for the current
-    // request. The next request will likely hit the ideal case above.
-    return of(this.firebaseIdToken!);
+    return this.getValidIdentityPlatformToken$();
   }
 
   /**
@@ -241,6 +217,29 @@ export class AuthService {
     // This is synchronous and tells us if we have a valid, non-expired token.
     if (!this.isLoggedIn()) {
       return of();
+    }
+
+    // TOKEN_REFRESH_FIX_V1: previously this always returned the possibly-stale
+    // cached token below, with no refresh attempt at all -- causing every
+    // request to silently reuse an already-expired ID token indefinitely once
+    // isLoggedIn() stopped tying "logged in" to the token's own 1-hour expiry
+    // (see AUTH_SESSION_TIMEOUT_FIX_V1 below). If the Firebase Auth instance
+    // is ready, force a genuine refresh via getIdToken(true), same as
+    // getValidFirebaseToken$.
+    const currentUser = this.auth.currentUser;
+    if (currentUser) {
+      return from(currentUser.getIdToken(true)).pipe(
+        tap((token: string) => {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const expiry = payload.exp * 1000;
+
+          this.firebaseIdToken = token;
+          this.firebaseTokenExpiry = expiry;
+
+          const session: FirebaseSession = {token, expiry};
+          localStorage.setItem(FIREBASE_SESSION_KEY, JSON.stringify(session));
+        }),
+      );
     }
 
     // Fallback case: The Firebase Auth instance is not yet initialized, but we

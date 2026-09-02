@@ -240,7 +240,7 @@ class TestBackgroundWorkers:
 
     @pytest.mark.anyio
     @patch("src.database.WorkerDatabase")
-    @patch("src.videos.veo_service.GenAIModelSetup.init")
+    @patch("src.videos.veo_service.GenAIModelSetup.init_regional")
     @patch("src.videos.veo_service.generate_thumbnail")
     @patch(
         "src.common.storage_service.GcsService",
@@ -320,7 +320,7 @@ class TestBackgroundWorkers:
             # Let's test calling it synchronously in a def test instead of async!
 
     @patch("src.database.WorkerDatabase")
-    @patch("src.videos.veo_service.GenAIModelSetup.init")
+    @patch("src.videos.veo_service.GenAIModelSetup.init_regional")
     @patch("src.videos.veo_service.generate_thumbnail")
     def test_process_video_in_background_sync(
         self,
@@ -417,7 +417,7 @@ class TestBackgroundWorkers:
             mock_media_repo.update.assert_called_once()
 
     @patch("src.database.WorkerDatabase")
-    @patch("src.videos.veo_service.GenAIModelSetup.init")
+    @patch("src.videos.veo_service.GenAIModelSetup.init_regional")
     @patch("src.videos.veo_service.generate_thumbnail")
     def test_process_video_in_background_duration_and_resolution_4k(
         self,
@@ -604,7 +604,7 @@ class TestBackgroundWorkers:
             mock_media_repo.update.assert_called_once()
 
     @patch("src.database.WorkerDatabase")
-    @patch("src.videos.veo_service.GenAIModelSetup.init")
+    @patch("src.videos.veo_service.GenAIModelSetup.init_regional")
     @patch("src.videos.veo_service.generate_thumbnail")
     def test_process_video_in_background_with_references(
         self,
@@ -700,7 +700,7 @@ class TestBackgroundWorkers:
             mock_client.models.generate_videos.assert_called_once()
 
     @patch("src.database.WorkerDatabase")
-    @patch("src.videos.veo_service.GenAIModelSetup.init")
+    @patch("src.videos.veo_service.GenAIModelSetup.init_regional")
     @patch("src.videos.veo_service.generate_thumbnail")
     def test_process_video_in_background_with_start_end_source_video_assets(
         self,
@@ -810,7 +810,7 @@ class TestBackgroundWorkers:
             assert config.last_frame.gcs_uri == "gs://b/end.png"
 
     @patch("src.database.WorkerDatabase")
-    @patch("src.videos.veo_service.GenAIModelSetup.init")
+    @patch("src.videos.veo_service.GenAIModelSetup.init_regional")
     @patch("src.videos.veo_service.generate_thumbnail")
     def test_process_video_in_background_with_start_end_source_video_media_items(
         self,
@@ -946,7 +946,7 @@ class TestBackgroundWorkers:
             assert config.last_frame.gcs_uri == "gs://b/end_media.png"
 
     @patch("src.database.WorkerDatabase")
-    @patch("src.videos.veo_service.GenAIModelSetup.init")
+    @patch("src.videos.veo_service.GenAIModelSetup.init_regional")
     def test_process_video_in_background_error(
         self,
         mock_genai_init,
@@ -992,7 +992,7 @@ class TestBackgroundWorkers:
             mock_media_repo.update.assert_called_once()
 
     @patch("src.database.WorkerDatabase")
-    @patch("src.videos.veo_service.GenAIModelSetup.init")
+    @patch("src.videos.veo_service.GenAIModelSetup.init_regional")
     @patch("src.videos.veo_service.generate_thumbnail")
     def test_process_video_in_background_with_source_media_items(
         self,
@@ -1083,7 +1083,7 @@ class TestBackgroundWorkers:
             mock_media_repo.update.assert_called_once()
 
     @patch("src.database.WorkerDatabase")
-    @patch("src.videos.veo_service.GenAIModelSetup.init")
+    @patch("src.videos.veo_service.GenAIModelSetup.init_regional")
     @patch("src.videos.veo_service.generate_thumbnail")
     def test_process_video_in_background_with_source_media_items_extensions(
         self,
@@ -1169,7 +1169,7 @@ class TestBackgroundWorkers:
             mock_media_repo.update.assert_called_once()
 
     @patch("src.database.WorkerDatabase")
-    @patch("src.videos.veo_service.GenAIModelSetup.init")
+    @patch("src.videos.veo_service.GenAIModelSetup.init_regional")
     @patch("src.videos.veo_service.generate_thumbnail")
     def test_process_video_in_background_with_source_media_items_references(
         self,

@@ -269,3 +269,60 @@ async def test_enhance_prompt_from_dto_video_omni_flash_landscape(
             in call_args["original_prompt"]
         )
         assert "gemini-omni-flash-preview" in call_args["original_prompt"]
+
+
+@pytest.mark.anyio
+async def test_enhance_prompt_from_dto_frames_to_video_start_end_asset_ids(
+    gemini_service,
+):
+    from src.videos.dto.create_veo_dto import CreateVeoDto
+    from src.common.base_dto import GenerationModelEnum
+
+    dto = CreateVeoDto(
+        prompt="A runner sprinting on the track",
+        generation_model=GenerationModelEnum.VEO_3_1_GENERATE_001,
+        start_image_asset_id={"id": 10, "type": "source_asset"},
+        end_image_asset_id={"id": 11, "type": "source_asset"},
+        workspace_id=1,
+    )
+
+    res = await gemini_service.enhance_prompt_from_dto(
+        dto, PromptTargetEnum.VIDEO
+    )
+    assert res is not None
+    assert "Strict Subject & Object Consistency" in res
+    assert "between the provided START FRAME and END FRAME" in res
+    assert "A runner sprinting on the track" in res
+
+
+@pytest.mark.anyio
+async def test_enhance_prompt_from_dto_frames_to_video_media_items(
+    gemini_service,
+):
+    from src.videos.dto.create_veo_dto import CreateVeoDto
+    from src.common.base_dto import GenerationModelEnum
+    from src.common.schema.media_item_model import SourceMediaItemLink, AssetRoleEnum
+
+    dto = CreateVeoDto(
+        prompt="A car turning at sunset",
+        generation_model=GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
+        source_media_items=[
+            SourceMediaItemLink(
+                media_item_id=101, media_index=0, role=AssetRoleEnum.START_FRAME
+            ),
+            SourceMediaItemLink(
+                media_item_id=102, media_index=0, role=AssetRoleEnum.END_FRAME
+            ),
+        ],
+        workspace_id=1,
+    )
+
+    res = await gemini_service.enhance_prompt_from_dto(
+        dto, PromptTargetEnum.VIDEO
+    )
+    assert res is not None
+    assert "Strict Subject & Object Consistency" in res
+    assert "Context & Environment Preservation" in res
+    assert "Seamless Motion & Temporal Continuity" in res
+    assert "between the provided START FRAME and END FRAME" in res
+

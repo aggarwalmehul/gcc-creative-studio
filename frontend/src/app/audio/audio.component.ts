@@ -100,10 +100,10 @@ export class AudioComponent implements OnInit {
   selectedLanguage: LanguageEnum = LanguageEnum.EN_US;
   selectedVoice: VoiceEnum | string = VoiceEnum.PUCK;
 
-  // GEMINI_3_1_TTS_UPGRADE_V1: lets the user pick which Gemini TTS model to use
-  // (Chirp only has one model, so no equivalent dropdown needed there).
-  selectedGeminiTtsModel: GenerationModelEnum = GenerationModelEnum.GEMINI_2_5_FLASH_TTS;
+  // GEMINI_3_1_PRO_TTS_DEFAULT_V1: Gemini 3.1 Pro TTS is now the default checked option.
+  selectedGeminiTtsModel: GenerationModelEnum = GenerationModelEnum.GEMINI_3_1_PRO_TTS;
   geminiTtsModels: {value: GenerationModelEnum; label: string}[] = [
+    {value: GenerationModelEnum.GEMINI_3_1_PRO_TTS, label: 'Gemini 3.1 Pro TTS (Preview)'},
     {value: GenerationModelEnum.GEMINI_3_1_FLASH_TTS, label: 'Gemini 3.1 Flash TTS (Preview)'},
     {value: GenerationModelEnum.GEMINI_2_5_PRO_TTS, label: 'Gemini 2.5 Pro TTS'},
     {value: GenerationModelEnum.GEMINI_2_5_FLASH_TTS, label: 'Gemini 2.5 Flash TTS'},
@@ -235,6 +235,7 @@ export class AudioComponent implements OnInit {
       sampleCount: this.sampleCount,
       selectedLanguage: this.selectedLanguage,
       selectedVoice: this.selectedVoice,
+      selectedGeminiTtsModel: this.selectedGeminiTtsModel, // GEMINI_3_1_PRO_TTS_DEFAULT_V1
       // LYRIA_3_PRO_UPGRADE_V1
       durationSeconds: this.durationSeconds,
       lyrics: this.lyrics,
@@ -251,6 +252,9 @@ export class AudioComponent implements OnInit {
     this.sampleCount = state.sampleCount;
     this.selectedLanguage = state.selectedLanguage as LanguageEnum;
     this.selectedVoice = state.selectedVoice as VoiceEnum;
+    if (state.selectedGeminiTtsModel) {
+      this.selectedGeminiTtsModel = state.selectedGeminiTtsModel as GenerationModelEnum;
+    }
     // LYRIA_3_PRO_UPGRADE_V1 (reference images intentionally NOT restored --
     // asset selections don't persist across sessions, same as other
     // ephemeral media selections elsewhere in the app)

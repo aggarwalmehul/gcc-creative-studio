@@ -69,6 +69,10 @@ class AssetRoleEnum(str, Enum):
     VIDEO_EXTENSION_SOURCE = (
         "video_extension_source"  # The original video to be extended
     )
+    MUSIC_REFERENCE = (
+        "music_reference"  # LYRIA_REF_IMAGE_FIX_V1: image used as visual
+        # inspiration for Lyria 3 Pro music generation
+    )
     VIDEO_EXTENSION_CHUNK = (
         "video_extension_chunk"  # The generated chunk in an extension job
     )

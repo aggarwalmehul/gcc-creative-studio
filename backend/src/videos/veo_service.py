@@ -567,6 +567,31 @@ def _process_video_in_background(
                                     request_dto.prompt, request_dto.aspect_ratio
                                 )
 
+                                # FRAMES_TO_VIDEO_GROUNDING_V1: enforce frame labeling and object continuity
+                                is_frames_to_video_req = bool(
+                                    start_image_for_api or end_image_for_api
+                                )
+                                if (
+                                    is_frames_to_video_req
+                                    and "**Objective:" not in omni_prompt
+                                    and "**Frame-to-Video" not in omni_prompt
+                                ):
+                                    if start_image_for_api and end_image_for_api:
+                                        omni_prompt = (
+                                            f"{omni_prompt}\n\n"
+                                            "**Frame-to-Video Continuity Directive:**\n"
+                                            "- Frame 1 is the START FRAME (initial state of the video).\n"
+                                            "- Frame 2 is the END FRAME (final state of the video).\n"
+                                            "- Generate a seamless transition connecting start to end while strictly preserving subject and object identity, facial features, apparel, colors, and background environment."
+                                        )
+                                    elif start_image_for_api:
+                                        omni_prompt = (
+                                            f"{omni_prompt}\n\n"
+                                            "**Frame-to-Video Continuity Directive:**\n"
+                                            "- Frame 1 is the START FRAME (initial state of the video).\n"
+                                            "- Animate starting from this frame while strictly preserving subject and object identity, colors, and environment."
+                                        )
+
                                 t1_inputs = [
                                     {"type": "text", "text": omni_prompt}
                                 ]
@@ -648,6 +673,8 @@ def _process_video_in_background(
                                 max_retries = 3
                                 last_err = None
                                 interaction = None
+                                contents = []
+                                thought_signature = None
                                 for attempt in range(max_retries):
                                     try:
                                         if is_turn_2:
@@ -665,52 +692,62 @@ def _process_video_in_background(
                                                 input=t1_inputs,
                                                 response_format=omni_response_format,
                                             )
-                                        break
                                     except Exception as e:
                                         last_err = e
+                                        interaction = None
                                         worker_logger.warning(
                                             f"Gemini Omni interactions API call attempt {attempt + 1} failed: {e}. Retrying..."
                                         )
                                         if attempt < max_retries - 1:
                                             await asyncio.sleep(2)
+                                        continue
 
-                                if interaction is None:
-                                    raise last_err or Exception(
-                                        "Failed to generate video after multiple attempts."
+                                    # TOKEN_LOGGING_AUDIT_FIX_V1: log usage on every attempt, even empty ones
+                                    log_tokens(
+                                        "creative-studio",
+                                        model_name_for_api,
+                                        interaction,
                                     )
 
-                                # TOKEN_LOGGING_AUDIT_FIX_V1: Omni video generation was
-                                # never logging token usage at all.
-                                log_tokens(
-                                    "creative-studio",
-                                    model_name_for_api,
-                                    interaction,
-                                )
+                                    contents = []
+                                    thought_signature = None
+                                    if interaction.steps:
+                                        for step in interaction.steps:
+                                            if step.type == "model_output":
+                                                contents.extend(step.content)
+                                                if hasattr(step, "signature") and step.signature:
+                                                    thought_signature = step.signature
+                                                elif isinstance(step, dict) and step.get("signature"):
+                                                    thought_signature = step.get("signature")
 
-                                interaction_id = interaction.id
-                                contents = []
-                                thought_signature = None
-                                if interaction.steps:
-                                    for step in interaction.steps:
-                                        if step.type == "model_output":
-                                            contents.extend(step.content)
-                                            if (
-                                                hasattr(step, "signature")
-                                                and step.signature
-                                            ):
-                                                thought_signature = (
-                                                    step.signature
-                                                )
-                                            elif isinstance(
-                                                step, dict
-                                            ) and step.get("signature"):
-                                                thought_signature = step.get(
-                                                    "signature"
-                                                )
+                                    if contents and contents[0].data:
+                                        interaction_id = interaction.id
+                                        break  # success, exit retry loop
+
+                                    # RETRY_ON_EMPTY_OUTPUT_FIX_V1: interaction returned status="completed" but
+                                    # no steps/usage — retry instead of failing on the first empty response.
+                                    try:
+                                        step_types = [
+                                            getattr(s, "type", s.get("type") if isinstance(s, dict) else repr(s))
+                                            for s in (interaction.steps or [])
+                                        ]
+                                    except Exception as dbg_e:
+                                        step_types = f"<failed to introspect steps: {dbg_e}>"
+                                    worker_logger.error(
+                                        f"EMPTY_OUTPUT_DEBUG (attempt {attempt + 1}/{max_retries}) "
+                                        f"interaction_id={getattr(interaction, 'id', None)} "
+                                        f"step_types={step_types} "
+                                        f"raw_interaction={interaction!r}"
+                                    )
+                                    last_err = Exception(
+                                        f"Interactions call {i + 1} succeeded but returned no model output data."
+                                    )
+                                    if attempt < max_retries - 1:
+                                        await asyncio.sleep(2)
 
                                 if not contents or not contents[0].data:
-                                    raise Exception(
-                                        f"Interactions call {i + 1} succeeded but returned no model output data."
+                                    raise last_err or Exception(
+                                        f"Interactions call {i + 1} succeeded but returned no model output data after {max_retries} attempts."
                                     )
 
                                 raw_video_bytes = base64.b64decode(
@@ -815,56 +852,93 @@ def _process_video_in_background(
                                 request_dto.resolution, "720p"
                             )
 
-                            # Run sync API call in thread
-                            operation: types.GenerateVideosOperation = (
-                                await asyncio.to_thread(
-                                    client.models.generate_videos,
-                                    model=request_dto.generation_model,
-                                    prompt=request_dto.prompt,
-                                    image=start_image_for_api,
-                                    video=source_video_for_api,
-                                    config=types.GenerateVideosConfig(
-                                        number_of_videos=request_dto.number_of_media,
-                                        output_gcs_uri=gcs_output_directory,
-                                        aspect_ratio=request_dto.aspect_ratio,
-                                        resolution=api_resolution,
-                                        negative_prompt=request_dto.negative_prompt,
-                                        generate_audio=request_dto.generate_audio,
-                                        # TODO: Pass from dto the secs if extending video (4, 5, 6, 7)
-                                        duration_seconds=(
-                                            request_dto.duration_seconds
-                                            if not source_video_for_api
-                                            else 7
-                                        ),
-                                        last_frame=end_image_for_api,
-                                        reference_images=(
-                                            reference_images_for_api
-                                            if reference_images_for_api
-                                            else None
-                                        ),
-                                    ),
-                                )
-                            )
+                            veo_max_retries = 3
+                            operation = None
 
-                            # Poll the operation status until the video is ready
-                            while not operation.done:
-                                worker_logger.info(
-                                    "Waiting for video generation to complete, polling video generation status...",
-                                    extra={
-                                        "json_fields": {
-                                            "media_id": media_item_id,
-                                            "operation_name": operation.name,
+                            # FRAMES_TO_VIDEO_GROUNDING_V1: enforce object & subject consistency when frames are passed
+                            veo_prompt = request_dto.prompt
+                            if (
+                                (start_image_for_api or end_image_for_api)
+                                and "**Objective:" not in veo_prompt
+                                and "**Frame-to-Video" not in veo_prompt
+                            ):
+                                if start_image_for_api and end_image_for_api:
+                                    veo_prompt = (
+                                        f"{veo_prompt}. Maintain strict character identity, apparel, textures, and object consistency connecting the start frame to the end frame without altering key subjects."
+                                    )
+                                elif start_image_for_api:
+                                    veo_prompt = (
+                                        f"{veo_prompt}. Maintain strict character identity, apparel, and object consistency starting from the provided start frame."
+                                    )
+
+                            for veo_attempt in range(veo_max_retries):
+                                # Run sync API call in thread
+                                operation: types.GenerateVideosOperation = (
+                                    await asyncio.to_thread(
+                                        client.models.generate_videos,
+                                        model=request_dto.generation_model,
+                                        prompt=veo_prompt,
+                                        image=start_image_for_api,
+                                        video=source_video_for_api,
+                                        config=types.GenerateVideosConfig(
+                                            number_of_videos=request_dto.number_of_media,
+                                            output_gcs_uri=gcs_output_directory,
+                                            aspect_ratio=request_dto.aspect_ratio,
+                                            resolution=api_resolution,
+                                            negative_prompt=request_dto.negative_prompt,
+                                            generate_audio=request_dto.generate_audio,
+                                            # TODO: Pass from dto the secs if extending video (4, 5, 6, 7)
+                                            duration_seconds=(
+                                                request_dto.duration_seconds
+                                                if not source_video_for_api
+                                                else 7
+                                            ),
+                                            last_frame=end_image_for_api,
+                                            reference_images=(
+                                                reference_images_for_api
+                                                if reference_images_for_api
+                                                else None
+                                            ),
+                                        )
+                                    )
+                                )
+
+                                # Poll the operation status until the video is ready
+                                while not operation.done:
+                                    worker_logger.info(
+                                        "Waiting for video generation to complete, polling video generation status...",
+                                        extra={
+                                            "json_fields": {
+                                                "media_id": media_item_id,
+                                                "operation_name": operation.name,
+                                            },
                                         },
-                                    },
-                                )
-                                await asyncio.sleep(10)
-                                operation = await asyncio.to_thread(
-                                    client.operations.get,
-                                    operation,
-                                )
+                                    )
+                                    await asyncio.sleep(10)
+                                    operation = await asyncio.to_thread(
+                                        client.operations.get,
+                                        operation,
+                                    )
 
-                            if operation.error:
-                                raise Exception(operation.error)
+                                if operation.error:
+                                    error_code = (
+                                        operation.error.get("code")
+                                        if isinstance(operation.error, dict)
+                                        else getattr(operation.error, "code", None)
+                                    )
+                                    # RESOURCE_EXHAUSTED_RETRY_FIX_V1: code 8 (RESOURCE_EXHAUSTED) means
+                                    # Google's backend is transiently overloaded — retry the whole
+                                    # generation request instead of failing the job outright.
+                                    if error_code == 8 and veo_attempt < veo_max_retries - 1:
+                                        worker_logger.warning(
+                                            f"Veo generation attempt {veo_attempt + 1}/{veo_max_retries} "
+                                            f"hit RESOURCE_EXHAUSTED: {operation.error}. Retrying..."
+                                        )
+                                        await asyncio.sleep(10)
+                                        continue
+                                    raise Exception(operation.error)
+
+                                break  # success, exit retry loop
 
                             if (
                                 not operation

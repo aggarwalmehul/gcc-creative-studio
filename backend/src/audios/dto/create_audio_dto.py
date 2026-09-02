@@ -114,10 +114,11 @@ class CreateAudioDto(BaseDto):
             GenerationModelEnum.LYRIA_3_PRO,  # LYRIA_3_PRO_UPGRADE_V1
             GenerationModelEnum.LYRIA_3_CLIP,  # LYRIA_3_CLIP_UPGRADE_V1
             GenerationModelEnum.CHIRP_3,
+            GenerationModelEnum.GEMINI_3_1_PRO_TTS,  # GEMINI_3_1_PRO_TTS_DEFAULT_V1
+            GenerationModelEnum.GEMINI_3_1_FLASH_TTS,  # GEMINI_3_1_TTS_UPGRADE_V1
+            GenerationModelEnum.GEMINI_2_5_PRO_TTS,
             GenerationModelEnum.GEMINI_2_5_FLASH_TTS,
             GenerationModelEnum.GEMINI_2_5_FLASH_LITE_PREVIEW_TTS,
-            GenerationModelEnum.GEMINI_2_5_PRO_TTS,
-            GenerationModelEnum.GEMINI_3_1_FLASH_TTS,  # GEMINI_3_1_TTS_UPGRADE_V1
         }
 
         if value not in allowed_audio_models:

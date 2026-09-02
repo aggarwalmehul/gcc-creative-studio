@@ -68,6 +68,17 @@ async def get_current_user(
             decoded_token = await asyncio.to_thread(
                 auth.verify_id_token, token
             )
+        except (auth.ExpiredIdTokenError, auth.InvalidIdTokenError):
+            # AUTH_FALLBACK_MASKING_FIX_V1: these are genuine, well-defined
+            # Firebase token errors -- re-raise immediately so the outer
+            # handlers below produce a clean 401. Previously these were
+            # caught by the bare `except Exception` below (since both are
+            # subclasses of Exception) and silently routed into the Google
+            # OIDC fallback instead, which can never succeed for a real
+            # Firebase ID token (different signing/cert authority), producing
+            # a confusing "Certificate for key id ... not found" 500 error
+            # that masked the real "token expired" condition from the client.
+            raise
         except Exception as fb_err:  # noqa: BLE001
             logger.info(
                 "Firebase verify failed (%s); trying Google OIDC...", fb_err

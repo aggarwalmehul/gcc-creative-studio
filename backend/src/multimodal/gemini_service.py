@@ -37,6 +37,7 @@ from src.brand_guidelines.repository.brand_guideline_repository import (
 from src.brand_guidelines.schema.brand_guideline_model import (
     BrandGuidelineModel,
 )
+from src.common.schema.media_item_model import AssetRoleEnum
 from src.config.config_service import config_service
 from src.images.dto.create_imagen_dto import CreateImagenDto
 from src.multimodal.dto.create_prompt_imagen_dto import CreatePromptImageDto
@@ -249,6 +250,23 @@ class GeminiService:
             and (dto.source_asset_ids or dto.source_media_items)
         )
 
+        # --- Prompt Enhancement for Frames-to-Video Object & Scene Continuity ---
+        is_frames_to_video = (
+            isinstance(dto, CreateVeoDto)
+            and (
+                dto.start_image_asset_id
+                or dto.end_image_asset_id
+                or (
+                    dto.source_media_items
+                    and any(
+                        item.role
+                        in [AssetRoleEnum.START_FRAME, AssetRoleEnum.END_FRAME]
+                        for item in dto.source_media_items
+                    )
+                )
+            )
+        )
+
         if is_gemini_i2i:
             dto.prompt = (
                 "**Objective:** Perform a targeted edit on the source image based on the user's request.\n"
@@ -282,8 +300,46 @@ class GeminiService:
             # We also set the response mime type to TEXT to reflect this.
             return dto.prompt
 
+        if is_frames_to_video:
+            has_start = bool(
+                dto.start_image_asset_id
+                or (
+                    dto.source_media_items
+                    and any(
+                        item.role == AssetRoleEnum.START_FRAME
+                        for item in dto.source_media_items
+                    )
+                )
+            )
+            has_end = bool(
+                dto.end_image_asset_id
+                or (
+                    dto.source_media_items
+                    and any(
+                        item.role == AssetRoleEnum.END_FRAME
+                        for item in dto.source_media_items
+                    )
+                )
+            )
+
+            frame_desc = (
+                "between the provided START FRAME and END FRAME"
+                if (has_start and has_end)
+                else "starting from the provided START FRAME"
+            )
+
+            dto.prompt = (
+                f"**Objective:** Generate a seamless, high-fidelity video interpolation {frame_desc}.\n"
+                "**Guiding Principles:**\n"
+                "1. **Strict Subject & Object Consistency:** You MUST strictly preserve all character identities, facial features, hair, clothing, textures, objects, shapes, colors, and lighting shown in the input frame(s). Do not introduce random substitute characters or alter subject appearance.\n"
+                "2. **Context & Environment Preservation:** Maintain exact continuity of the background setting, environment, spatial composition, perspective, and lighting from the provided frame(s).\n"
+                "3. **Seamless Motion & Temporal Continuity:** Animate the natural transition and movement described in the user's prompt smoothly connecting the starting state to the ending state without jitter, morphing artifacts, or sudden discontinuities.\n\n"
+                f"**Action / Transition Request:** {dto.prompt}"
+            )
+            return dto.prompt
+
         # --- Prepend Brand Guidelines if available ---
-        if dto.use_brand_guidelines and dto.workspace_id and not is_gemini_i2i:
+        if dto.use_brand_guidelines and dto.workspace_id and not is_gemini_i2i and not is_frames_to_video:
             search_dto = BrandGuidelineSearchDto(
                 workspace_id=dto.workspace_id, limit=1
             )

@@ -25,6 +25,7 @@ export interface AudioState {
   sampleCount: number;
   selectedLanguage: string;
   selectedVoice: string;
+  selectedGeminiTtsModel?: string; // GEMINI_3_1_PRO_TTS_DEFAULT_V1
   // LYRIA_3_PRO_UPGRADE_V1
   durationSeconds?: number;
   lyrics?: string;
@@ -45,6 +46,7 @@ export class AudioStateService {
     sampleCount: 1,
     selectedLanguage: 'en-US',
     selectedVoice: 'Puck',
+    selectedGeminiTtsModel: 'gemini-3.1-pro-tts-preview', // GEMINI_3_1_PRO_TTS_DEFAULT_V1
     durationSeconds: undefined,
     lyrics: '',
     instrumental: false,

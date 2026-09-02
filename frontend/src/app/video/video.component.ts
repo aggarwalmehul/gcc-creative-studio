@@ -670,14 +670,20 @@ export class VideoComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    // FRAME_INTERPOLATION_VALIDATION_V1: Google's Veo API requires a start frame whenever an
-    // end/last frame is provided (an end-only frame triggers "Frame
-    // interpolation requires both an input image and a last frame"). A
-    // start-only frame is valid (normal image-to-video, not interpolation).
+    // FRAME_INTERPOLATION_VALIDATION_V2: Google's Veo API requires a start frame whenever an
+    // end/last frame is provided. Images can arrive via TWO different storage
+    // locations depending on upload method: startImageAssetId/endImageAssetId
+    // (direct upload) OR sourceMediaItems[0]/[1] (media-library selection) --
+    // V1 only checked the ID fields and missed the sourceMediaItems path,
+    // which is why it never fired for library-selected images.
+    const hasStartImage =
+      this.startImageAssetId !== null || !!this.sourceMediaItems[0];
+    const hasEndImage =
+      this.endImageAssetId !== null || !!this.sourceMediaItems[1];
     if (
       this.currentMode === 'Frames to Video' &&
-      this.endImageAssetId !== null &&
-      this.startImageAssetId === null
+      hasEndImage &&
+      !hasStartImage
     ) {
       handleInfoSnackbar(
         this._snackBar,
@@ -1250,22 +1256,29 @@ export class VideoComponent implements OnInit, AfterViewInit {
       !this.isExtensionMode &&
       totalImages === 2
     ) {
-      const imageToClear = imageNumberJustSet === 1 ? 2 : 1;
-      if (imageToClear === 1) {
-        this.startImageAssetId = null;
-        this.image1Preview = null;
-        this.sourceMediaItems[0] = null;
-      } else {
-        // Clearing image 2
-        this.endImageAssetId = null;
-        this.image2Preview = null;
-        this.sourceMediaItems[1] = null;
-      }
-
-      handleSuccessSnackbar(
-        this._snackBar,
-        "Veo 3 doesn't support 2 images as input, so we've cleared the other one for you.",
+      // FRAMES_TO_VIDEO_PRESERVE_FRAMES_V1: Veo 3.0 does not support image inputs/interpolation.
+      // Instead of wiping out the user's start or end frame, auto-switch to Veo 3.1 (or Gemini Omni)
+      // which natively supports start & end frame interpolation.
+      const veo31Model = this.generationModels.find(
+        m => m.value === 'veo-3.1-generate-001',
       );
+      const omniModel = this.generationModels.find(
+        m => m.value === 'gemini-omni-flash-preview',
+      );
+
+      if (veo31Model) {
+        this.selectModel(veo31Model);
+        handleSuccessSnackbar(
+          this._snackBar,
+          "Switched to Veo 3.1 to support start and end frame interpolation.",
+        );
+      } else if (omniModel) {
+        this.selectModel(omniModel);
+        handleSuccessSnackbar(
+          this._snackBar,
+          "Switched to Gemini Omni to support start and end frame interpolation.",
+        );
+      }
     }
   }
 
