@@ -10,6 +10,9 @@ except Exception as e:
     log.warning("TOKENLOG: bq init failed: %s", e)
 
 _TABLE = "ltm-craftstudio-poc.token_usage.usage"
+# FEATURE_PORT_BILLING_UNITS_V1: raw billing quantities (seconds/images/chars);
+# priced downstream in genai-token-report (backend never computes cost).
+_BILLING_TABLE = "ltm-craftstudio-poc.token_usage.billing_units"
 current_user_email = contextvars.ContextVar("current_user_email", default="unknown")
 
 # TOKEN_LOGGING_AUDIT_FIX_V1: the google-genai SDK exposes token usage in TWO
@@ -68,3 +71,34 @@ def log_tokens(platform: str, model: str, resp):
             log.info("TOKENLOG: inserted %s tokens for %s", row["total"], model)
     except Exception as e:
         log.warning("TOKENLOG: insert exception: %s", e)
+
+
+# FEATURE_PORT_BILLING_UNITS_V1: parallel to log_tokens(), but for the
+# non-LLM media models that bill per-second / per-image / per-character
+# rather than per-token. Logs the RAW quantity + unit only; the report
+# service applies the per-unit rate. Never raises.
+def log_billing_units(platform: str, model: str, unit_type: str, quantity):
+    if _bq is None:
+        log.warning("BILLINGUNITS: skip — no bq client"); return
+    try:
+        q = float(quantity or 0)
+    except Exception:
+        log.warning("BILLINGUNITS: skip — non-numeric quantity %r", quantity); return
+    if q <= 0:
+        log.info("BILLINGUNITS: skip — zero quantity for %s", model); return
+    row = {
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "platform": platform,
+        "user_email": current_user_email.get() or "unknown",
+        "model": str(model),
+        "unit_type": str(unit_type),
+        "quantity": q,
+    }
+    try:
+        errors = _bq.insert_rows_json(_BILLING_TABLE, [row])
+        if errors:
+            log.warning("BILLINGUNITS: insert errors: %s", errors)
+        else:
+            log.info("BILLINGUNITS: inserted %.3f %s for %s", q, unit_type, model)
+    except Exception as e:
+        log.warning("BILLINGUNITS: insert exception: %s", e)

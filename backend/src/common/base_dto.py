@@ -57,11 +57,19 @@ class GenerationModelEnum(str, Enum):
     GEMINI_3_FLASH_PREVIEW = "gemini-3-flash-preview"
     VTO = "virtual-try-on-001"
 
+    # Text / LLM Models (UPSTREAM_SYNC_9THSEP_V1)
+    GEMINI_3_7_FLASH = "gemini-3.7-flash"
+    GEMINI_3_1_PRO_PREVIEW = "gemini-3.1-pro-preview"
+    GEMINI_3_1_FLASH_PREVIEW = "gemini-3.1-flash-preview"
+    GEMINI_3_1_FLASH_LITE_PREVIEW = "gemini-3.1-flash-lite-preview"
+
     # Video-Specific Models
     GEMINI_OMNI = "gemini-omni-generate-preview"
     GEMINI_OMNI_FLASH_PREVIEW = "gemini-omni-flash-preview"
+    GEMINI_OMNI_1_1_FLASH_PREVIEW = "gemini-omni-1.1-flash-preview"  # UPSTREAM_SYNC_9THSEP_V1
     VEO_3_1_FAST_GENERATE_001 = "veo-3.1-fast-generate-001"
     VEO_3_1_LITE_GENERATE_001 = "veo-3.1-lite-generate-001"
+    VEO_3_1_LITE_PREVIEW = "veo-3.1-lite-generate-preview"  # UPSTREAM_SYNC_9THSEP_V1
     VEO_3_1_GENERATE_001 = "veo-3.1-generate-001"
     VEO_3_1_PREVIEW = "veo-3.1-generate-preview"
     VEO_3_FAST = "veo-3.0-fast-generate-001"

@@ -102,6 +102,15 @@ class ConfigService(BaseSettings):
     )
     BACKEND_SERVICE_ACCOUNT_EMAIL: str = ""
 
+    # --- Cloud Tasks (async thumbnails) --- FEATURE_PORT_CLOUD_TASKS_THUMBNAILS_V1
+    TASKS_QUEUE_ID: str = "thumbnail-generation"
+    TASKS_LOCATION: str = "us-central1"
+    TASKS_WORKER_URL: str = ""
+    THUMBNAILS_ASYNC_ENABLED: bool = False
+
+    # --- Per-model billing telemetry --- FEATURE_PORT_BILLING_UNITS_V1
+    BILLING_UNITS_ENABLED: bool = False
+
     @model_validator(mode="before")
     @classmethod
     def get_default_project_id(cls, values: Any) -> Any:

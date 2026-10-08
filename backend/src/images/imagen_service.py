@@ -41,6 +41,7 @@ from src.common.base_dto import (
 from src.common.media_utils import generate_image_thumbnail_from_gcs
 from src.common.schema.genai_model_setup import GenAIModelSetup
 from src.common.token_logger import log_tokens  # TOKEN_LOGGING_AUDIT_FIX_V1
+from src.common.token_logger import log_billing_units  # FEATURE_PORT_BILLING_UNITS_V1
 from src.common.schema.media_item_model import (
     AssetRoleEnum,
     JobStatusEnum,
@@ -424,6 +425,20 @@ def _process_vto_in_background(
                             ),
                         }
                         await media_repo.update(media_item_id, update_data)
+
+                        # FEATURE_PORT_BILLING_UNITS_V1: per-image billing (VTO), once/job.
+                        try:
+                            if config_service.BILLING_UNITS_ENABLED:
+                                _n = len(permanent_gcs_uris)
+                                if _n:
+                                    log_billing_units(
+                                        "creative-studio",
+                                        getattr(getattr(request_dto, "generation_model", None), "value", None) or "virtual-try-on",
+                                        "images",
+                                        float(_n),
+                                    )
+                        except Exception as _billing_err:
+                            worker_logger.warning("BILLINGUNITS: emit failed (non-fatal): %s", _billing_err)
                         worker_logger.info(
                             "Successfully processed VTO job.",
                             extra={
@@ -534,7 +549,9 @@ def gemini_generate_image(
 
             # TOKEN_LOGGING_AUDIT_FIX_V1: Gemini image-to-image (via Imagen service)
             # generation was never logging token usage at all.
-            log_tokens("creative-studio", model, response)
+            # TOKEN_LOGGING_MODEL_ID_FIX_V1: log the clean model id, not the
+            # enum repr (mirrors the fix already proven in veo_service.py).
+            log_tokens("creative-studio", getattr(model, "value", str(model)), response)
 
             grounding_metadata = None
 
@@ -995,6 +1012,20 @@ def _process_image_in_background(
                             "mime_type": mime_type,
                         }
                         await media_repo.update(media_item_id, update_data)
+
+                        # FEATURE_PORT_BILLING_UNITS_V1: per-image billing, once/job.
+                        try:
+                            if config_service.BILLING_UNITS_ENABLED:
+                                _n = len(permanent_gcs_uris)
+                                if _n:
+                                    log_billing_units(
+                                        "creative-studio",
+                                        getattr(request_dto.generation_model, "value", str(request_dto.generation_model)),
+                                        "images",
+                                        float(_n),
+                                    )
+                        except Exception as _billing_err:
+                            worker_logger.warning("BILLINGUNITS: emit failed (non-fatal): %s", _billing_err)
                         worker_logger.info(
                             "Successfully processed image job %s",
                             media_item_id,

@@ -202,9 +202,11 @@ class CreateVeoDto(BaseDto):
                 GenerationModelEnum.VEO_3_1_PREVIEW,
                 GenerationModelEnum.VEO_3_1_GENERATE_001,
                 GenerationModelEnum.VEO_3_1_LITE_GENERATE_001,
+                GenerationModelEnum.VEO_3_1_LITE_PREVIEW,  # UPSTREAM_SYNC_9THSEP_V1
                 GenerationModelEnum.VEO_3_1_FAST_GENERATE_001,
                 GenerationModelEnum.GEMINI_OMNI,
                 GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
+                GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,  # UPSTREAM_SYNC_9THSEP_V1
             }
             if model not in supported_reference_models:
                 raise ValueError(
@@ -235,6 +237,7 @@ class CreateVeoDto(BaseDto):
         if model in (
             GenerationModelEnum.GEMINI_OMNI,
             GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
+            GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,  # UPSTREAM_SYNC_9THSEP_V1
         ):
             allowed_resolutions = {"1K"}
         elif model == GenerationModelEnum.VEO_3_1_LITE_GENERATE_001:
@@ -253,6 +256,7 @@ class CreateVeoDto(BaseDto):
         if model in (
             GenerationModelEnum.GEMINI_OMNI,
             GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
+            GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,  # UPSTREAM_SYNC_9THSEP_V1
         ):
             max_duration = 10
 
@@ -288,9 +292,11 @@ class CreateVeoDto(BaseDto):
         valid_video_ratios = [
             GenerationModelEnum.GEMINI_OMNI,
             GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
+            GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,  # UPSTREAM_SYNC_9THSEP_V1
             GenerationModelEnum.VEO_3_1_PREVIEW,
             GenerationModelEnum.VEO_3_1_GENERATE_001,
             GenerationModelEnum.VEO_3_1_LITE_GENERATE_001,
+            GenerationModelEnum.VEO_3_1_LITE_PREVIEW,  # UPSTREAM_SYNC_9THSEP_V1
             GenerationModelEnum.VEO_3_1_FAST_GENERATE_001,
             GenerationModelEnum.VEO_3_FAST,
             GenerationModelEnum.VEO_3_QUALITY,

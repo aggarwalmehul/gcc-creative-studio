@@ -14,19 +14,17 @@
 
 steps:
   # Step 1: Build the container image using the standard Docker builder.
-  # Using SHORT_SHA for the tag is a best practice for traceability.
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build'
+    entrypoint: 'bash'
     env: ['DOCKER_BUILDKIT=1']
     args:
-      [
-        'build',
-        '-t',
-        '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_SERVICE_NAME}:$SHORT_SHA',
-        '.',
-      ]
-    # This ensures the build context is the 'backend' folder
-    dir: 'backend'
+      - '-c'
+      - |
+        if [ -d "backend" ]; then
+          cd backend
+        fi
+        docker build -t "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_SERVICE_NAME}:${_TAG}" .
 
   # Step 2: Push the container image to Google Artifact Registry.
   - name: 'gcr.io/cloud-builders/docker'
@@ -34,7 +32,7 @@ steps:
     args:
       [
         'push',
-        '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_SERVICE_NAME}:$SHORT_SHA',
+        '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_SERVICE_NAME}:${_TAG}',
       ]
 
   # Step 3: Deploy to Cloud Run using the gcloud CLI builder.
@@ -46,7 +44,7 @@ steps:
       - 'run'
       - 'deploy'
       - '${_SERVICE_NAME}'
-      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_SERVICE_NAME}:$SHORT_SHA'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_SERVICE_NAME}:${_TAG}'
       - '--region'
       - '${_REGION}'
       - '--quiet' # Suppress interactive prompts for CI/CD environments
@@ -55,7 +53,7 @@ steps:
 # This integrates the build with Google Cloud's security features, like showing
 # vulnerability scan results in the Cloud Build UI.
 images:
-  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_SERVICE_NAME}:$SHORT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/${_SERVICE_NAME}:${_TAG}'
 
 # Substitutions will be passed in from the Cloud Build trigger.
 # You can override these for manual runs.
@@ -63,6 +61,7 @@ substitutions:
   _SERVICE_NAME: 'cstudio-be'
   _REPO_NAME: 'cs-be-development-repo'
   _REGION: 'us-central1'
+  _TAG: 'latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY

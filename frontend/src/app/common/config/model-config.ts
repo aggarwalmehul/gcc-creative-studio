@@ -243,6 +243,26 @@ export const MODEL_CONFIGS: GenerationModelConfig[] = [
     },
   },
   {
+    // UPSTREAM_SYNC_9THSEP_V1: newer Omni sibling model.
+    value: 'gemini-omni-1.1-flash-preview',
+    viewValue: 'Gemini Omni 1.1 Flash (Preview)',
+    type: 'VIDEO',
+    icon: 'layers',
+    capabilities: {
+      supportedModes: [
+        'Text to Video',
+        'Ingredients to Video',
+        'Frames to Video',
+      ],
+      maxReferenceImages: 3,
+      supportedAspectRatios: ['16:9', '9:16'],
+      supportedResolutions: ['1K'],
+      supportedDurations: [4, 6, 8, 10],
+      supportsAudio: true,
+      supportsVideoExtension: true, // VIDEO_EXTENSION_CAPABILITY_FIX_V1
+    },
+  },
+  {
     value: 'veo-3.1-generate-001',
     viewValue: 'Veo 3.1',
     type: 'VIDEO',
@@ -278,6 +298,12 @@ export const MODEL_CONFIGS: GenerationModelConfig[] = [
       supportsAudio: true,
     },
   },
+  // UPSTREAM_SYNC_9THSEP_V1 / REMOVED_10THSEP: veo-3.1-lite-generate-preview
+  // hidden from the dropdown -- Vertex AI returns 404 NOT_FOUND for this
+  // model in this project/region ("Publisher model ... was not found or
+  // your project does not have access to it"). Backend enum left in place
+  // (base_dto.py) since it costs nothing; re-add this entry once Google
+  // makes the model generally available / this project gets allowlisted.
   {
     value: 'veo-3.1-fast-generate-001',
     viewValue: 'Veo 3.1 Fast',

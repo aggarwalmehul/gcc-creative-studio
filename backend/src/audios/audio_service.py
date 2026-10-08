@@ -44,6 +44,7 @@ from src.common.base_dto import (
 )
 from src.common.schema.genai_model_setup import GenAIModelSetup
 from src.common.token_logger import log_tokens  # TOKEN_LOGGING_AUDIT_FIX_V1
+from src.common.token_logger import log_billing_units  # FEATURE_PORT_BILLING_UNITS_V1
 from src.source_assets.repository.source_asset_repository import (
     SourceAssetRepository,
 )  # LYRIA_3_PRO_UPGRADE_V1
@@ -523,6 +524,32 @@ def _process_audio_in_background(
                                 "generation_time": generation_time,
                             },
                         )
+                        # FEATURE_PORT_BILLING_UNITS_V1: once/job; TTS->characters, music->music_generations.
+                        try:
+                            if config_service.BILLING_UNITS_ENABLED:
+                                _n = len(permanent_gcs_uris)
+                                _model_id = getattr(request_dto.model, "value", str(request_dto.model))
+                                if _n:
+                                    if (
+                                        request_dto.model in AudioService.GEMINI_MODELS
+                                        or request_dto.model in AudioService.TTS_MODELS
+                                    ):
+                                        _chars = len(request_dto.prompt or "")
+                                        if _chars:
+                                            log_billing_units(
+                                                "creative-studio", _model_id, "characters", float(_chars) * _n,
+                                            )
+                                    elif (
+                                        request_dto.model in AudioService.MUSIC_MODELS
+                                        or request_dto.model in AudioService.MUSIC_MODELS_V3
+                                    ):
+                                        # FEATURE_PORT_BILLING_UNITS_V1: Lyria bills per
+                                        # GENERATION (flat $/clip), NOT per second — log clip count.
+                                        log_billing_units(
+                                            "creative-studio", _model_id, "music_generations", float(_n),
+                                        )
+                        except Exception as _billing_err:
+                            worker_logger.warning("BILLINGUNITS: emit failed (non-fatal): %s", _billing_err)
                         worker_logger.info(
                             f"Audio job {media_item_id} completed successfully."
                         )

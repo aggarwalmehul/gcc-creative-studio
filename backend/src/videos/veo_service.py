@@ -35,8 +35,38 @@ from src.common.base_dto import (
     ReferenceImageTypeEnum,
 )
 from src.common.media_utils import concatenate_videos, generate_thumbnail
+from src.common.task_queue import enqueue_thumbnail_task  # FEATURE_PORT_CLOUD_TASKS_THUMBNAILS_V1
 from src.common.schema.genai_model_setup import GenAIModelSetup
 from src.common.token_logger import log_tokens  # TOKEN_LOGGING_AUDIT_FIX_V1
+from src.common.token_logger import log_billing_units  # FEATURE_PORT_BILLING_UNITS_V1
+
+
+# ERROR_CLASSIFICATION_FIX_V1: classify known Vertex/Gemini content-policy and
+# capacity errors into clean, user-facing messages instead of surfacing the raw
+# exception string verbatim (previously dumped raw JSON into the UI toast, since
+# search.service.ts displays error_message as-is). Never raises; falls back to a
+# generic message for anything unrecognized. The raw error is always still logged
+# in full (structured, via worker_logger json_fields) for debugging + rate tracking.
+def _classify_generation_error(raw_error) -> tuple[str, str]:
+    s = str(raw_error)
+    if "'code': 3" in s or "usage guidelines" in s:
+        return (
+            "content_policy_image",
+            "This request was declined because the input image doesn't meet "
+            "content guidelines. Try a different image.",
+        )
+    if "content_blocked" in s or "speech edits" in s:
+        return (
+            "content_policy_audio",
+            "This request was declined by content moderation. Try adjusting "
+            "the prompt or audio.",
+        )
+    if "RESOURCE_EXHAUSTED" in s or "'code': 8" in s:
+        return (
+            "capacity_throttled",
+            "The service is temporarily busy. Please try again in a moment.",
+        )
+    return ("generation_error", "Video generation failed. Please try again.")
 from src.common.schema.media_item_model import (
     AssetRoleEnum,
     JobStatusEnum,
@@ -386,6 +416,7 @@ def _process_video_in_background(
                         if request_dto.generation_model in [
                             GenerationModelEnum.GEMINI_OMNI,
                             GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
+                            GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,  # UPSTREAM_SYNC_9THSEP_V1
                         ]:
                             worker_logger.info(
                                 "Running Gemini Omni video generation via Interactions API..."
@@ -659,10 +690,19 @@ def _process_video_in_background(
                                 if request_dto.duration_seconds
                                 else "8s"
                             )
-                            omni_response_format = {
+                            omni_response_format: dict[str, str] = {
                                 "type": "video",
                                 "duration": duration_str,
                             }
+                            # UPSTREAM_SYNC_9THSEP_V1: pass aspect_ratio through to the
+                            # Interactions API for portrait/landscape Omni output.
+                            if request_dto.aspect_ratio in (
+                                AspectRatioEnum.RATIO_9_16,
+                                AspectRatioEnum.RATIO_16_9,
+                            ):
+                                omni_response_format["aspect_ratio"] = (
+                                    request_dto.aspect_ratio.value
+                                )
 
                             num_outputs = 1
                             worker_logger.info(
@@ -776,28 +816,45 @@ def _process_video_in_background(
                                     mime_type="video/mp4",
                                 )
 
-                                # Generate local thumbnail
-                                thumbnail_path = await asyncio.to_thread(
-                                    generate_thumbnail,
-                                    local_output_path,
-                                )
-                                local_thumbnail_name = thumbnail_path or ""
-
-                                # Upload thumbnail to GCS
-                                thumbnail_gcs_blob = (
-                                    f"thumbnails/{media_item_id}_{i}.png"
-                                )
+                                # FEATURE_PORT_CLOUD_TASKS_THUMBNAILS_V1: when enabled, offload
+                                # thumbnail generation to a Cloud Tasks
+                                # worker instead of blocking this task on
+                                # ffmpeg + a second GCS upload.
+                                local_thumbnail_name = ""
                                 thumbnail_gcs_uri = ""
-                                if thumbnail_path:
-                                    thumbnail_gcs_uri = (
-                                        await asyncio.to_thread(
-                                            gcs_service.upload_file_to_gcs,
-                                            local_path=thumbnail_path,
-                                            destination_blob_name=thumbnail_gcs_blob,
-                                            mime_type="image/png",
-                                        )
-                                        or ""
+                                if (
+                                    config_service.THUMBNAILS_ASYNC_ENABLED
+                                    and config_service.TASKS_WORKER_URL
+                                    and final_gcs_uri
+                                ):
+                                    enqueue_thumbnail_task(
+                                        video_gcs_uri=final_gcs_uri,
+                                        media_item_id=media_item_id,
+                                        media_index=i,
                                     )
+                                else:
+                                    # Unchanged legacy synchronous path.
+                                    thumbnail_path = await asyncio.to_thread(
+                                        generate_thumbnail,
+                                        local_output_path,
+                                    )
+                                    local_thumbnail_name = (
+                                        thumbnail_path or ""
+                                    )
+
+                                    thumbnail_gcs_blob = (
+                                        f"thumbnails/{media_item_id}_{i}.png"
+                                    )
+                                    if thumbnail_path:
+                                        thumbnail_gcs_uri = (
+                                            await asyncio.to_thread(
+                                                gcs_service.upload_file_to_gcs,
+                                                local_path=thumbnail_path,
+                                                destination_blob_name=thumbnail_gcs_blob,
+                                                mime_type="image/png",
+                                            )
+                                            or ""
+                                        )
 
                                 # Clean up local temp files
                                 for local_path in [
@@ -1048,13 +1105,41 @@ def _process_video_in_background(
                             },
                         )
 
+                        # FEATURE_PORT_BILLING_UNITS_V1: emit per-model billing
+                        # quantity ONCE per successful job (NOT at the token
+                        # call-site, which fires per Omni retry). Non-fatal.
+                        try:
+                            if config_service.BILLING_UNITS_ENABLED:
+                                _dur = getattr(request_dto, "duration_seconds", None) or 0
+                                _count = len(final_gcs_uris)
+                                if _dur and _count:
+                                    log_billing_units(
+                                        "creative-studio",
+                                        getattr(request_dto.generation_model, "value", str(request_dto.generation_model)),
+                                        "video_seconds",
+                                        float(_dur) * _count,
+                                    )
+                        except Exception as _billing_err:
+                            worker_logger.warning(
+                                "BILLINGUNITS: emit failed (non-fatal): %s", _billing_err
+                            )
+
                     except Exception as e:
+                        # ERROR_CLASSIFICATION_FIX_V1: classify before logging/storing.
+                        _error_category, _user_message = _classify_generation_error(e)
                         worker_logger.error(
-                            "Video generation task failed.",
+                            f"ERRCLASS: category={_error_category} "
+                            f"media_id={media_item_id} -- Video generation task failed.",
                             extra={
                                 "json_fields": {
                                     "media_id": media_item_id,
                                     "error": str(e),
+                                    "error_category": _error_category,
+                                    "model": getattr(
+                                        request_dto.generation_model,
+                                        "value",
+                                        str(request_dto.generation_model),
+                                    ),
                                 },
                             },
                             exc_info=True,
@@ -1062,7 +1147,7 @@ def _process_video_in_background(
                         # --- ON FAILURE, UPDATE THE DOCUMENT WITH AN ERROR STATUS ---
                         error_update_data = {
                             "status": JobStatusEnum.FAILED,
-                            "error_message": str(e),
+                            "error_message": _user_message,
                         }
                         await media_repo.update(
                             media_item_id, error_update_data
@@ -1231,13 +1316,22 @@ def _process_video_concatenation_in_background(
                         )
 
                     except Exception as e:
+                        # ERROR_CLASSIFICATION_FIX_V1: same classification, applied here too.
+                        _error_category, _user_message = _classify_generation_error(e)
                         worker_logger.error(
-                            f"Video concatenation task failed: {e}",
+                            f"ERRCLASS: category={_error_category} "
+                            f"media_id={media_item_id} -- Video concatenation task failed: {e}",
+                            extra={
+                                "json_fields": {
+                                    "media_id": media_item_id,
+                                    "error_category": _error_category,
+                                },
+                            },
                             exc_info=True,
                         )
                         error_update_data = {
                             "status": JobStatusEnum.FAILED,
-                            "error_message": str(e),
+                            "error_message": _user_message,
                         }
                         await media_repo.update(
                             media_item_id, error_update_data
