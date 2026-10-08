@@ -436,20 +436,93 @@ def _process_audio_in_background(
                             ]
                             lyria_inputs.extend(lyria_reference_images)
 
+                            # LYRIA3_CONTENT_BLOCKED_RETRY_V1 (ported from upstream
+                            # 5e8b6bdc): Lyria 3's policy filter refusal depends on
+                            # wording, so on content_blocked we retry ONCE with a
+                            # neutral style-only brief instead of repeating. Unlike
+                            # upstream, reference images, duration and lyrics are
+                            # preserved; only the text item changes.
+                            import re as _re
+                            _lyria_head = _re.split(
+                                r"(?<=[.!?])\s+|\n",
+                                (request_dto.prompt or "").strip(),
+                                maxsplit=1,
+                            )[0]
+                            _lyria_head = _re.split(
+                                r"\b(?:featuring|with|that|which|evoking|evokes|"
+                                r"layered|transitioning|paired|accented|building|"
+                                r"as if|like)\b",
+                                _lyria_head,
+                                maxsplit=1,
+                                flags=_re.IGNORECASE,
+                            )[0]
+                            _lyria_head = " ".join(_lyria_head.split()[:12]).strip(
+                                " ,;:-.!?"
+                            )
+                            lyria_retry_inputs: list[dict] | None = None
+                            if _lyria_head:
+                                _retry_parts = [f"{_lyria_head}."]
+                                if request_dto.duration_seconds:
+                                    _retry_parts.append(
+                                        f"Make this song approximately "
+                                        f"{request_dto.duration_seconds} seconds long."
+                                    )
+                                if request_dto.lyrics and not request_dto.instrumental:
+                                    _retry_parts.append(
+                                        "Background music for a commercial, "
+                                        "clean and unobtrusive."
+                                    )
+                                    _retry_parts.append(
+                                        f"Use the following lyrics for the "
+                                        f"vocals:\n{request_dto.lyrics}"
+                                    )
+                                else:
+                                    _retry_parts.append(
+                                        "Instrumental background music for a "
+                                        "commercial, clean and unobtrusive, "
+                                        "no vocals."
+                                    )
+                                _retry_prompt = " ".join(_retry_parts)
+                                if _retry_prompt != composed_prompt:
+                                    lyria_retry_inputs = [
+                                        {"type": "text", "text": _retry_prompt},
+                                    ]
+                                    lyria_retry_inputs.extend(lyria_reference_images)
+
                             async def generate_music_v3(
                                 index: int,
                             ) -> str | None:
                                 try:
-                                    interaction = await asyncio.to_thread(
-                                        vertex_client.interactions.create,
-                                        # LYRIA_3_CLIP_UPGRADE_V1: use whichever
-                                        # Lyria 3 variant was requested
-                                        # (Pro or Clip) instead of hardcoding
-                                        # Pro -- both share this code path.
-                                        model=request_dto.model.value,
-                                        input=lyria_inputs,
-                                        stream=False,
-                                    )
+                                    try:
+                                        interaction = await asyncio.to_thread(
+                                            vertex_client.interactions.create,
+                                            # LYRIA_3_CLIP_UPGRADE_V1: use whichever
+                                            # Lyria 3 variant was requested
+                                            # (Pro or Clip) instead of hardcoding
+                                            # Pro -- both share this code path.
+                                            model=request_dto.model.value,
+                                            input=lyria_inputs,
+                                            stream=False,
+                                        )
+                                    except Exception as first_error:
+                                        # LYRIA3_CONTENT_BLOCKED_RETRY_V1
+                                        if not (
+                                            lyria_retry_inputs
+                                            and "content_blocked" in str(first_error)
+                                        ):
+                                            raise
+                                        worker_logger.warning(
+                                            f"LYRIA3RETRY: content_blocked "
+                                            f"media_id={media_item_id} index={index}; "
+                                            f"retrying with simplified brief: "
+                                            f"{lyria_retry_inputs[0]['text']!r}"
+                                        )
+                                        interaction = await asyncio.to_thread(
+                                            vertex_client.interactions.create,
+                                            model=request_dto.model.value,
+                                            input=lyria_retry_inputs,
+                                            stream=False,
+                                        )
 
                                     # TOKEN_LOGGING_AUDIT_FIX_V1: Lyria 3
                                     # Pro/Clip generation was never logging
