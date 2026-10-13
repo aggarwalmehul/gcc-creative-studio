@@ -855,7 +855,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   resetAllFilters() {
     this.searchRequest = {
       prompt: '',
-      generationModel: 'gemini-3.1-flash-image',
+      generationModel: 'gemini-nano-banana-2.1',
       aspectRatio: '1:1',
       numberOfMedia: 1,
       style: null,
@@ -891,7 +891,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (!supportsIngredients) {
       const nanoBanana2 = this.generationModels.find(
-        m => m.value === 'gemini-3.1-flash-image',
+        m => m.value === 'gemini-nano-banana-2.1',
       );
       if (nanoBanana2) {
         this.selectModel(nanoBanana2);

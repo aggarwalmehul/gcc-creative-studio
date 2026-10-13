@@ -42,7 +42,7 @@ class CreateImagenDto(BaseDto):
         description="The ID of the workspace for this generation.",
     )
     generation_model: GenerationModelEnum = Field(
-        default=GenerationModelEnum.GEMINI_3_1_FLASH_IMAGE_PREVIEW,
+        default=GenerationModelEnum.GEMINI_NANO_BANANA_2_1,  # NANO_BANANA_2_1_V1: old default 404s on Vertex
         description="Model used for image generation.",
     )
     aspect_ratio: AspectRatioEnum = Field(
@@ -130,6 +130,7 @@ class CreateImagenDto(BaseDto):
             GenerationModelEnum.GEMINI_3_1_FLASH_IMAGE_PREVIEW,
             GenerationModelEnum.GEMINI_3_1_FLASH_IMAGE,
             GenerationModelEnum.GEMINI_3_1_FLASH_LITE_IMAGE,
+            GenerationModelEnum.GEMINI_NANO_BANANA_2_1,
         ]
         if value not in valid_generation_models:
             raise ValueError("Invalid generation model for imagen.")

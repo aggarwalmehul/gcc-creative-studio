@@ -54,6 +54,7 @@ class GenerationModelEnum(str, Enum):
     GEMINI_3_PRO_IMAGE = "gemini-3-pro-image"
     GEMINI_3_1_FLASH_IMAGE = "gemini-3.1-flash-image"
     GEMINI_3_1_FLASH_LITE_IMAGE = "gemini-3.1-flash-lite-image"
+    GEMINI_NANO_BANANA_2_1 = "gemini-nano-banana-2.1"  # NANO_BANANA_2_1_V1
     GEMINI_3_FLASH_PREVIEW = "gemini-3-flash-preview"
     VTO = "virtual-try-on-001"
 
@@ -117,6 +118,7 @@ class GenerationModelEnum(str, Enum):
             GenerationModelEnum.GEMINI_3_1_FLASH_IMAGE_PREVIEW,
             GenerationModelEnum.GEMINI_3_1_FLASH_IMAGE,
             GenerationModelEnum.GEMINI_3_1_FLASH_LITE_IMAGE,
+            GenerationModelEnum.GEMINI_NANO_BANANA_2_1,
         ]
 
     @property
@@ -126,6 +128,7 @@ class GenerationModelEnum(str, Enum):
             GenerationModelEnum.GEMINI_3_1_FLASH_IMAGE_PREVIEW,
             GenerationModelEnum.GEMINI_3_1_FLASH_IMAGE,
             GenerationModelEnum.GEMINI_3_1_FLASH_LITE_IMAGE,
+            GenerationModelEnum.GEMINI_NANO_BANANA_2_1,
         ]:
             return [
                 AspectRatioEnum.RATIO_1_1,
@@ -173,6 +176,7 @@ class GenerationModelEnum(str, Enum):
             GenerationModelEnum.GEMINI_3_1_FLASH_IMAGE_PREVIEW,
             GenerationModelEnum.GEMINI_3_1_FLASH_IMAGE,
             GenerationModelEnum.GEMINI_3_1_FLASH_LITE_IMAGE,
+            GenerationModelEnum.GEMINI_NANO_BANANA_2_1,
         ]:
             return 14
         if self.is_gemini_image_model:
