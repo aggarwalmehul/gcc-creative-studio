@@ -51,7 +51,7 @@ export class ImageStateService {
       prompt: '',
       negativePrompt: '',
       aspectRatio: '1:1',
-      model: 'gemini-3.1-flash-lite-image',
+      model: 'gemini-nano-banana-2.1', // NANO_BANANA_2_1_DEFAULT_V1
       lighting: '',
       watermark: false,
       googleSearch: false,

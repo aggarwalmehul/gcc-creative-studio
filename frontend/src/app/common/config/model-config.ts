@@ -114,7 +114,7 @@ export const MODEL_CONFIGS: GenerationModelConfig[] = [
     },
   },
   {
-    value: 'gemini-2.5-flash-image',
+    value: 'gemini-3-pro-image', // NANO_BANANA_PRO_REAL_V1 (was gemini-2.5-flash-image)
     viewValue: 'Nano Banana Pro',
     type: 'IMAGE',
     imageSrc: 'assets/images/banana-peel.png',

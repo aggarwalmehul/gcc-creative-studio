@@ -97,7 +97,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   // This object holds the current state of all user selections.
   searchRequest: ImagenRequest = {
     prompt: '',
-    generationModel: 'gemini-3.1-flash-lite-image',
+    generationModel: 'gemini-nano-banana-2.1', // NANO_BANANA_2_1_DEFAULT_V1
     aspectRatio: '1:1',
     numberOfMedia: 1,
     style: null,
@@ -131,7 +131,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   );
   selectedGenerationModelObject =
     this.generationModels.find(
-      m => m.value === 'gemini-3.1-flash-lite-image',
+      m => m.value === 'gemini-nano-banana-2.1',
     ) || this.generationModels[0];
   selectedGenerationModel = this.selectedGenerationModelObject.viewValue;
   aspectRatioOptions: {
