@@ -43,11 +43,11 @@ async def verify_cloud_tasks_oidc(
         logger.error("[verify_cloud_tasks_oidc] Invalid OIDC token: %s", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid OIDC token: {e}",
+            detail="Invalid OIDC token.",  # TASK_AUTH_FAIL_CLOSED_V1
         ) from e
 
-    expected_email = _SIGNING_SA_EMAIL
-    if expected_email and claims.get("email") != expected_email:
+    expected_email = _SIGNING_SA_EMAIL  # TASK_AUTH_FAIL_CLOSED_V1
+    if not expected_email or claims.get("email") != expected_email:
         logger.error(
             "[verify_cloud_tasks_oidc] Unexpected invoker SA: %s",
             claims.get("email"),
