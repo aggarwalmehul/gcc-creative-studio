@@ -34,7 +34,7 @@ export interface AudioState {
   instrumental?: boolean;
 }
 
-export const DEFAULT_LYRIA_MODEL = 'lyria-3-clip-preview';
+export const DEFAULT_LYRIA_MODEL = 'lyria-002'; // LYRIA_PICKER_MERGE_V1
 
 @Injectable({
   providedIn: 'root',

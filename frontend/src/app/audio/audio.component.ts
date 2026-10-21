@@ -95,7 +95,8 @@ export class AudioComponent implements OnInit {
   /** Concrete Lyria model used when the "Lyria (Music)" family is selected. */
   lyriaModel: string = DEFAULT_LYRIA_MODEL;
   readonly lyriaModels: GenerationModelConfig[] = MODEL_CONFIGS.filter(
-    m => m.type === 'AUDIO' && m.value.startsWith('lyria'),
+    // LYRIA_PICKER_MERGE_V1: Lyria 3 has its own Pro/Clip toggles; dropdown is Lyria 2 only
+    m => m.type === 'AUDIO' && m.value.startsWith('lyria') && !m.value.startsWith('lyria-3'),
   );
   prompt = '';
   negativePrompt = '';
@@ -448,7 +449,9 @@ export class AudioComponent implements OnInit {
     if (this.selectedModel === 'lyria') {
       // LYRIA_PICKER_MERGE_V1: upstream picker value if set, else Lyria 2
       backendModel =
-        (this.lyriaModel as GenerationModelEnum) || GenerationModelEnum.LYRIA_002;
+        this.lyriaModel && !this.lyriaModel.startsWith('lyria-3')  // stale saved state
+          ? (this.lyriaModel as GenerationModelEnum)
+          : GenerationModelEnum.LYRIA_002;
     } else if (this.selectedModel === 'lyria-3-pro') {
       // LYRIA_3_PRO_UPGRADE_V1
       backendModel = GenerationModelEnum.LYRIA_3_PRO;
