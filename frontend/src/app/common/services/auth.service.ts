@@ -256,7 +256,6 @@ export class AuthService {
         tap((userDetails: UserModel) => {
           // The backend is the source of truth. Save the returned profile to local storage.
           localStorage.setItem(USER_DETAILS, JSON.stringify(userDetails));
-          console.log('User profile successfully synced with backend.');
         }),
         catchError((error: HttpErrorResponse) => {
           console.error('Failed to sync user with backend', error);
@@ -377,5 +376,25 @@ export class AuthService {
     // refresh requires re-authentication or more complex flows not covered here.
     // For a simple deploy button click, getting a fresh token on sign-in might suffice.
     return this.currentOAuthAccessToken;
+  }
+
+  decodeJwtPayload(token: string): any {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) {
+      throw new Error('Invalid JWT token');
+    }
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(
+      base64.length + ((4 - (base64.length % 4)) % 4),
+      '=',
+    );
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    // eslint-disable-next-line n/no-unsupported-features/node-builtins
+    const decoded = new TextDecoder().decode(bytes);
+    return JSON.parse(decoded);
   }
 }

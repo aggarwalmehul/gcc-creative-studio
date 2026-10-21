@@ -77,22 +77,9 @@ export class UpscaleComponent implements OnInit, OnDestroy {
     private galleryService: GalleryService,
     private _snackBar: MatSnackBar,
     private router: Router,
-    public matIconRegistry: MatIconRegistry,
-    private sanitizer: DomSanitizer,
   ) {
-    this.matIconRegistry.addSvgIcon(
-      'mobile-white-gemini-spark-icon',
-      this.setPath(`${this.path}/mobile-white-gemini-spark-icon.svg`),
-    );
-
     // Initialize the combined job stream
     this.activeUpscaleJob$ = this.sourceAssetService.activeUpscaleJob$;
-  }
-
-  private path = '../../assets/images';
-
-  private setPath(url: string): SafeResourceUrl {
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }
 
   ngOnInit(): void {
@@ -192,7 +179,7 @@ export class UpscaleComponent implements OnInit, OnDestroy {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        // Handle the result which could be a SourceAssetResponseDto or an object wrapper
+        // Handle the result which could be a SourceAssetResponseDto, MediaItemSelection, or object wrapper
         let asset: SourceAssetResponseDto | null = null;
 
         // Normalize every shape ImageSelectorComponent can emit:
@@ -205,6 +192,59 @@ export class UpscaleComponent implements OnInit, OnDestroy {
           asset = Array.isArray(result.selection)
             ? (result.selection[0] as SourceAssetResponseDto)
            : (result.selection as SourceAssetResponseDto);
+        } else if (result.mediaItem) {
+          const mediaItem: MediaItem = result.mediaItem;
+          const index = result.selectedIndex || 0;
+          const gcsUri = mediaItem.gcsUris?.[index] || '';
+          const presignedUrl = mediaItem.presignedUrls?.[index] || gcsUri;
+          const presignedThumb =
+            mediaItem.presignedThumbnailUrls?.[index] || presignedUrl;
+
+          asset = {
+            id: mediaItem.id,
+            userId: mediaItem.userEmail || '',
+            gcsUri: gcsUri,
+            originalFilename:
+              mediaItem.titles?.[index] ||
+              mediaItem.prompt ||
+              'Generated Image',
+            mimeType: mediaItem.mimeType || 'image/png',
+            aspectRatio: mediaItem.aspectRatio || '1:1',
+            fileHash: '',
+            createdAt: mediaItem.createdAt || '',
+            updatedAt: mediaItem.updatedAt || '',
+            presignedUrl: presignedUrl,
+            presignedThumbnailUrl: presignedThumb,
+            presignedOriginalUrl:
+              mediaItem.originalPresignedUrls?.[index] || presignedUrl,
+          };
+          (asset as any).itemType = 'media_item';
+        } else if (result.gcsUris && result.gcsUris.length > 0) {
+          const mediaItem: MediaItem = result;
+          const index = 0;
+          const gcsUri = mediaItem.gcsUris?.[index] || '';
+          const presignedUrl = mediaItem.presignedUrls?.[index] || gcsUri;
+
+          asset = {
+            id: mediaItem.id,
+            userId: mediaItem.userEmail || '',
+            gcsUri: gcsUri,
+            originalFilename:
+              mediaItem.titles?.[index] ||
+              mediaItem.prompt ||
+              'Generated Image',
+            mimeType: mediaItem.mimeType || 'image/png',
+            aspectRatio: mediaItem.aspectRatio || '1:1',
+            fileHash: '',
+            createdAt: mediaItem.createdAt || '',
+            updatedAt: mediaItem.updatedAt || '',
+            presignedUrl: presignedUrl,
+            presignedThumbnailUrl:
+              mediaItem.presignedThumbnailUrls?.[index] || presignedUrl,
+            presignedOriginalUrl:
+              mediaItem.originalPresignedUrls?.[index] || presignedUrl,
+          };
+          (asset as any).itemType = 'media_item';
         } else if (result.id) {
           asset = result as SourceAssetResponseDto;
         }
@@ -212,7 +252,7 @@ export class UpscaleComponent implements OnInit, OnDestroy {
         if (asset) {
           this.selectedAsset = asset;
           this.assetPair.original = {
-            name: asset.originalFilename,
+            name: asset.originalFilename || 'Original Image',
             url: asset.presignedUrl || asset.gcsUri,
           };
           this.assetPair.aspectRatio = asset.aspectRatio;
@@ -236,8 +276,7 @@ export class UpscaleComponent implements OnInit, OnDestroy {
         image_preservation_factor: this.imagePreservationFactor,
       })
       .subscribe({
-        next: job => {
-          console.log('Upscale job started:', job);
+        next: () => {
           // The subscription to activeUpscaleJob$ will handle the rest
         },
         error: err => {

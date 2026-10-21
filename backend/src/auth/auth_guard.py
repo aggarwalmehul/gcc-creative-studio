@@ -17,7 +17,7 @@
 import asyncio
 import logging
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from firebase_admin import auth
 
@@ -28,61 +28,108 @@ from google.oauth2 import id_token
 from src.config.config_service import config_service
 from src.users.user_model import UserModel, UserRoleEnum
 from src.users.user_service import UserService
+import os
 from src.common.token_logger import current_user_email
 from src.workspaces.workspace_service import WorkspaceService
 from src.workspaces.dto.create_workspace_dto import CreateWorkspaceDto
+from src.common.request_context import is_agent_request
 
-# Initialize the service once to be used by dependencies.
-# user_service = UserService()  <-- REMOVED
-
-# This scheme will require the client to send a token in the Authorization
-# header. It tells FastAPI how to find the token but doesn't validate it
-# itself.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# Initialize the scheme without auto_error so we can handle fallback internal auth
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 
 
 logger = logging.getLogger(__name__)
 
 
+_AGENT_TOKENS_ENABLED = os.getenv("ALLOW_AGENT_ACCESS_TOKENS", "").lower() == "true"
+
+
+async def _verify_firebase_token(token: str) -> dict | None:
+    """AUTH_MERGE_SYNC_V1: try Firebase first (frontend uses signInWithPopup).
+
+    Returns None to fall back to Google OIDC. Expired/invalid Firebase tokens
+    are re-raised (AUTH_FALLBACK_MASKING_FIX_V1) so callers get a clean 401.
+    """
+    try:
+        logger.info("Verifying token using Firebase Admin SDK...")
+        return await asyncio.to_thread(auth.verify_id_token, token)
+    except (auth.ExpiredIdTokenError, auth.InvalidIdTokenError):
+        raise
+    except Exception as fb_err:  # noqa: BLE001
+        logger.info("Firebase verify failed (%s); trying Google OIDC...", fb_err)
+        return None
+
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
+    token: str | None = Depends(oauth2_scheme),
     user_service: UserService = Depends(UserService),
     workspace_service: WorkspaceService = Depends(WorkspaceService),
 ) -> UserModel:
     """Dependency that handles the entire authentication and user
-    provisioning flow.
-
-    1. Verifies the Firebase ID token.
-    2. Extracts user information (id, email).
-    3. Checks if a user document exists in Firestore.
-    4. If the user is new, creates their document ("Just-In-Time Provisioning").
-    5. Returns a Pydantic model with the user's data.
+    provisioning flow. Supports standard token or internal agent key auth.
     """
     try:
+        is_agent_request.set(False)
+        user_auth_header = request.headers.get("X-User-Authorization")
+        if user_auth_header:
+            is_agent_request.set(True)
+            token = (
+                user_auth_header.replace("Bearer ", "")
+                .replace("bearer ", "")
+                .strip()
+            )
+
+        # 2. Fall back to Token verification
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing authentication token.",
+            )
+
         decoded_token = {}
-        # Try Firebase Admin SDK first (frontend uses signInWithPopup ->
-        # Firebase ID tokens). Fall back to Google OIDC for Identity
-        # Platform tokens.
-        try:
-            logger.info("Verifying token using Firebase Admin SDK...")
-            decoded_token = await asyncio.to_thread(
-                auth.verify_id_token, token
-            )
-        except (auth.ExpiredIdTokenError, auth.InvalidIdTokenError):
-            # AUTH_FALLBACK_MASKING_FIX_V1: these are genuine, well-defined
-            # Firebase token errors -- re-raise immediately so the outer
-            # handlers below produce a clean 401. Previously these were
-            # caught by the bare `except Exception` below (since both are
-            # subclasses of Exception) and silently routed into the Google
-            # OIDC fallback instead, which can never succeed for a real
-            # Firebase ID token (different signing/cert authority), producing
-            # a confusing "Certificate for key id ... not found" 500 error
-            # that masked the real "token expired" condition from the client.
-            raise
-        except Exception as fb_err:  # noqa: BLE001
-            logger.info(
-                "Firebase verify failed (%s); trying Google OIDC...", fb_err
-            )
+        # AUTH_MERGE_SYNC_V1: upstream agent access-token path, off unless
+        # ALLOW_AGENT_ACCESS_TOKENS=true (tokeninfo has no audience check).
+        if token.startswith("ya29.") and _AGENT_TOKENS_ENABLED:
+            # --- Verify Google OAuth Access Token (Agent Engine) ---
+            logger.info("Verifying Google OAuth Access Token...")
+            import requests
+
+            try:
+                response = await asyncio.to_thread(
+                    requests.get,
+                    f"https://oauth2.googleapis.com/tokeninfo?access_token={token}",
+                    timeout=10,
+                )
+                if response.status_code != 200:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail=f"Invalid Google access token: {response.text}",
+                    )
+                decoded_token = response.json()
+            except requests.RequestException as req_err:
+                logger.error(
+                    "Failed to verify Google access token: %s", req_err
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Failed to contact Google authentication server.",
+                )
+
+            if not decoded_token or "email" not in decoded_token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid Google access token.",
+                )
+
+            if "name" not in decoded_token and "email" in decoded_token:
+                email_prefix = decoded_token["email"].split("@")[0]
+                decoded_token["name"] = (
+                    email_prefix if len(email_prefix) >= 2 else "User"
+                )
+        elif (decoded_token := await _verify_firebase_token(token)) is not None:
+            pass
+        else:
+            # --- Google Identity Platform (OIDC) fallback ---
             google_token_audience = config_service.GOOGLE_TOKEN_AUDIENCE
             decoded_token = await asyncio.to_thread(
                 id_token.verify_oauth2_token,
@@ -110,23 +157,28 @@ async def get_current_user(
                 ),
             )
 
-        # If ALLOWED_ORGS is configured, check the user's organization.
-        # Firebase tokens lack 'hd', so derive domain from email.
+        # AUTH_MERGE_SYNC_V1: upstream email allow-list + our email-domain
+        # fallback (Firebase tokens lack 'hd').
         effective_hd = token_info_hd
         if not effective_hd and email:
             effective_hd = email.split("@")[-1].lower()
-        if config_service.ALLOWED_ORGS:
-            if (
-                not effective_hd
-                or effective_hd not in config_service.ALLOWED_ORGS
-            ):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=(
-                        f"User from '{token_info_hd}' is not part of an "
-                        "allowed organization."
-                    ),
-                )
+
+        is_allowed = False
+        if config_service.ALLOWED_EMAILS and email in config_service.ALLOWED_EMAILS:
+            is_allowed = True
+        if (
+            not is_allowed
+            and config_service.ALLOWED_ORGS
+            and effective_hd in config_service.ALLOWED_ORGS
+        ):
+            is_allowed = True
+        if (
+            config_service.ALLOWED_EMAILS or config_service.ALLOWED_ORGS
+        ) and not is_allowed:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User is not authorized to access this application.",
+            )
 
         # Just-In-Time (JIT) User Provisioning:
         # Create a user profile in our database on their first API call.
@@ -176,7 +228,8 @@ async def get_current_user(
 
     except auth.ExpiredIdTokenError as exc:
         logger.error(
-            "[get_current_user - auth.ExpiredIdTokenError] for %s", email
+            "[get_current_user - auth.ExpiredIdTokenError] for %s",
+            email or "Unknown email",
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -185,7 +238,7 @@ async def get_current_user(
     except auth.InvalidIdTokenError as e:
         logger.error(
             "[get_current_user - auth.InvalidIdTokenError] for %s: %s",
-            email,
+            email or "Unknown email",
             e,
         )
         raise HTTPException(
