@@ -124,8 +124,14 @@ def _process_audio_in_background(
                                         if request_dto.voice_name
                                         else VoiceEnum.PUCK.value
                                     )
+                                    # GEMINI_TTS_PRO_404_FALLBACK_V1: 3.1 Pro TTS 404s; serve stale requests with 3.1 Flash TTS
+                                    _tts_model = (
+                                        GenerationModelEnum.GEMINI_3_1_FLASH_TTS.value
+                                        if request_dto.model == GenerationModelEnum.GEMINI_3_1_PRO_TTS
+                                        else request_dto.model.value
+                                    )
                                     response = client.models.generate_content(
-                                        model=request_dto.model.value,
+                                        model=_tts_model,
                                         contents=[
                                             (
                                                 "Please read the following text: \n"
