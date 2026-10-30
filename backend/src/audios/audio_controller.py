@@ -25,6 +25,7 @@ from src.auth.auth_guard import RoleChecker, get_current_user
 from src.galleries.dto.gallery_response_dto import MediaItemResponse
 from src.users.user_model import UserModel, UserRoleEnum
 from src.workspaces.workspace_auth_guard import WorkspaceAuth
+from src.common.base_dto import GenerationModelEnum  # GEMINI_TTS_REMAP_AT_INGRESS_V1
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,10 @@ async def generate_audio(
     """Generates audio based on the selected model (Lyria for music,
     Chirp/Gemini for speech).
     """
+    # GEMINI_TTS_REMAP_AT_INGRESS_V1: 3.1 Pro TTS 404s on Vertex; remap before the job so
+    # token logs, billing units, file names and the media record all say 3.1 Flash.
+    if create_audio_dto.model == GenerationModelEnum.GEMINI_3_1_PRO_TTS:
+        create_audio_dto.model = GenerationModelEnum.GEMINI_3_1_FLASH_TTS
     await workspace_auth.authorize(
         workspace_id=create_audio_dto.workspace_id,
         user=current_user,
