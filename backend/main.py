@@ -55,12 +55,15 @@ from src.videos.veo_controller import router as video_router
 from src.videos.thumbnail_worker_controller import (
     router as thumbnail_worker_router,
 )  # FEATURE_PORT_CLOUD_TASKS_THUMBNAILS_V1
-from src.workbench.router import router as workbench_router
+from src.workbench.workbench_controller import router as workbench_router
 from src.workflows.workflow_controller import router as workflow_router
 from src.workflows_executor.workflows_executor_controller import (
     router as workflows_executor_router,
 )
 from src.workspaces.workspace_controller import router as workspace_router
+from src.agents.agent_controller import router as agent_router
+from src.folders.folder_controller import router as folder_router
+from src.projects.project_controller import router as project_router
 
 
 def configure_cors(app):
@@ -94,6 +97,30 @@ def configure_cors(app):
     )
 
 
+async def _run_migrations_once_per_container(run_fn):
+    """MIGRATIONS_ONCE_PER_CONTAINER_V1: gunicorn workers share /tmp, so only the
+    first worker per container runs Alembic; the rest skip instead of each paying
+    ~35 s serially. RUN_MIGRATIONS_ON_STARTUP=false disables startup migrations."""
+    import asyncio
+    import fcntl
+    import os
+
+    if os.getenv("RUN_MIGRATIONS_ON_STARTUP", "true").lower() == "false":
+        logger.info("MIGRATIONS: skipped (RUN_MIGRATIONS_ON_STARTUP=false)")
+        return
+    done_marker = "/tmp/.cs_migrations_done"
+    with open("/tmp/.cs_migrations.lock", "w") as lock_file:
+        await asyncio.to_thread(fcntl.flock, lock_file, fcntl.LOCK_EX)
+        try:
+            if os.path.exists(done_marker):
+                logger.info("MIGRATIONS: already run in this container; skipping")
+                return
+            await run_fn()
+            open(done_marker, "w").close()
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for the FastAPI application.
@@ -115,7 +142,7 @@ async def lifespan(app: FastAPI):
     try:
         from src.database_migrations import run_pending_migrations
 
-        await run_pending_migrations()
+        await _run_migrations_once_per_container(run_pending_migrations)
     except Exception as e:
         logger.error(f"Failed to run database migrations: {e}")
         # We might want to stop startup here if migrations fail
@@ -131,7 +158,13 @@ async def lifespan(app: FastAPI):
 
     logger.info("Closing ThreadPoolExecutor...")
     app.state.executor.shutdown(wait=True)
-    # Your shutdown logic here, e.g., closing database connections
+    logger.info("Closing Cloud SQL Python Connector...")
+    try:
+        from src.database import cleanup_connector
+
+        await cleanup_connector()
+    except Exception as e:
+        logger.error(f"Error during database connector cleanup: {e}")
 
 
 app = FastAPI(
@@ -189,3 +222,6 @@ app.include_router(brand_guideline_router)
 app.include_router(workflow_router)
 app.include_router(workflows_executor_router)
 app.include_router(workbench_router)
+app.include_router(agent_router)
+app.include_router(project_router)
+app.include_router(folder_router)
