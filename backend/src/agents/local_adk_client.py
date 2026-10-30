@@ -38,6 +38,30 @@ logger = logging.getLogger(__name__)
 _CAMEL_RE = re.compile(r"(?<!^)(?=[A-Z])")
 
 
+# IZUMI_ID_TOKEN_AUTH_V1: Izumi on Cloud Run requires IAM auth. Attach a Google
+# ID token (audience = Izumi URL) from the metadata server; cached ~50 min.
+# Plain http:// URLs (local docker-compose) get no header.
+_ID_TOKEN_CACHE: dict[str, tuple[str, float]] = {}
+
+
+def _izumi_auth_headers(base_url: str) -> dict[str, str]:
+    import time
+
+    if not base_url.startswith("https://"):
+        return {}
+    cached = _ID_TOKEN_CACHE.get(base_url)
+    if cached and cached[1] > time.time():
+        return {"Authorization": f"Bearer {cached[0]}"}
+    import google.auth.transport.requests
+    import google.oauth2.id_token
+
+    token = google.oauth2.id_token.fetch_id_token(
+        google.auth.transport.requests.Request(), base_url
+    )
+    _ID_TOKEN_CACHE[base_url] = (token, time.time() + 3000)
+    return {"Authorization": f"Bearer {token}"}
+
+
 class LocalAgentError(RuntimeError):
     """Raised when the local Izumi agent cannot be reached or returns an error."""
 
@@ -146,6 +170,7 @@ class LocalAdkAgentClient:
     ) -> httpx.AsyncClient:
         return httpx.AsyncClient(
             base_url=self.base_url,
+            headers=_izumi_auth_headers(self.base_url),  # IZUMI_ID_TOKEN_AUTH_V1
             timeout=timeout if timeout is not None else self._timeout,
             transport=self._transport,
         )
