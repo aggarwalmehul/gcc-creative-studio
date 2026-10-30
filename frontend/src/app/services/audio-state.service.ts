@@ -51,7 +51,7 @@ export class AudioStateService {
     sampleCount: 1,
     selectedLanguage: 'en-US',
     selectedVoice: 'Puck',
-    selectedGeminiTtsModel: 'gemini-3.1-pro-tts-preview', // GEMINI_3_1_PRO_TTS_DEFAULT_V1
+    selectedGeminiTtsModel: 'gemini-3.1-flash-tts-preview', // GEMINI_TTS_PRO_404_FALLBACK_V1
     durationSeconds: undefined,
     lyrics: '',
     instrumental: false,

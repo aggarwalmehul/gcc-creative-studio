@@ -114,9 +114,9 @@ export class AudioComponent implements OnInit {
   selectedVoice: VoiceEnum | string = VoiceEnum.PUCK;
 
   // GEMINI_3_1_PRO_TTS_DEFAULT_V1: Gemini 3.1 Pro TTS is now the default checked option.
-  selectedGeminiTtsModel: GenerationModelEnum = GenerationModelEnum.GEMINI_3_1_PRO_TTS;
+  selectedGeminiTtsModel: GenerationModelEnum = GenerationModelEnum.GEMINI_3_1_FLASH_TTS; // GEMINI_TTS_PRO_404_FALLBACK_V1
   geminiTtsModels: {value: GenerationModelEnum; label: string}[] = [
-    {value: GenerationModelEnum.GEMINI_3_1_PRO_TTS, label: 'Gemini 3.1 Pro TTS (Preview)'},
+    // GEMINI_TTS_PRO_404_FALLBACK_V1: 3.1 Pro TTS removed (404 on Vertex for this project)
     {value: GenerationModelEnum.GEMINI_3_1_FLASH_TTS, label: 'Gemini 3.1 Flash TTS (Preview)'},
     {value: GenerationModelEnum.GEMINI_2_5_PRO_TTS, label: 'Gemini 2.5 Pro TTS'},
     {value: GenerationModelEnum.GEMINI_2_5_FLASH_TTS, label: 'Gemini 2.5 Flash TTS'},
