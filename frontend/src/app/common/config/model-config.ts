@@ -359,30 +359,14 @@ export const MODEL_CONFIGS: GenerationModelConfig[] = [
       supportsAudio: true,
     },
   },
-  {
-    value: 'veo-3.1-lite-generate-preview',
-    viewValue: 'Veo 3.1 Lite (Preview)',
-    type: 'VIDEO',
-    icon: 'volume_up',
-    capabilities: {
-      supportedModes: [
-        'Text to Video',
-        'Ingredients to Video',
-        'Frames to Video',
-      ],
-      maxReferenceImages: 3,
-      supportedAspectRatios: ['16:9', '9:16'],
-      supportedResolutions: ['1K', '2K'],
-      supportedDurations: [4, 6, 8],
-      supportsAudio: true,
-    },
-  },
-  // UPSTREAM_SYNC_9THSEP_V1 / REMOVED_10THSEP: veo-3.1-lite-generate-preview
-  // hidden from the dropdown -- Vertex AI returns 404 NOT_FOUND for this
-  // model in this project/region ("Publisher model ... was not found or
-  // your project does not have access to it"). Backend enum left in place
-  // (base_dto.py) since it costs nothing; re-add this entry once Google
-  // makes the model generally available / this project gets allowlisted.
+  // UPSTREAM_SYNC_9THSEP_V1 / REMOVED_10THSEP / CONFIRMED_2NDNOV: the
+  // 'veo-3.1-lite-generate-preview' dropdown entry was removed here --
+  // Vertex AI returns 404 NOT_FOUND for this model in this project/region
+  // ("Publisher model ... was not found or your project does not have
+  // access to it"), reconfirmed directly against the API on 2 Nov 2026
+  // (both us-central1 and global). Backend enum left in place (base_dto.py)
+  // since it costs nothing; re-add this entry once Google makes the model
+  // generally available / this project gets allowlisted.
   {
     value: 'veo-3.1-fast-generate-001',
     viewValue: 'Veo 3.1 Fast',
