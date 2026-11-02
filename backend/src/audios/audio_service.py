@@ -49,6 +49,10 @@ from src.common.token_logger import log_billing_units  # FEATURE_PORT_BILLING_UN
 from src.source_assets.repository.source_asset_repository import (
     SourceAssetRepository,
 )  # LYRIA_3_PRO_UPGRADE_V1
+from src.common.workspace_ownership import (
+    owned_media_item,
+    owned_source_asset,
+)  # OWNERSHIP_CHECK_V1
 from src.common.schema.media_item_model import JobStatusEnum, MediaItemModel
 from src.common.storage_service import GcsService
 from src.config.config_service import config_service
@@ -184,6 +188,7 @@ def _process_audio_in_background(
     request_dto: CreateAudioDto,
     user_email: str,
     user_id: int,
+    user: UserModel,  # OWNERSHIP_CHECK_V1
 ):
     from src.common.token_logger import current_user_email
     from src.database import WorkerDatabase
@@ -612,8 +617,8 @@ def _process_audio_in_background(
                                 for (
                                     asset_id
                                 ) in request_dto.reference_image_asset_ids:
-                                    asset = await source_asset_repo.get_by_id(
-                                        asset_id,
+                                    asset = await owned_source_asset(
+                                        source_asset_repo, asset_id, user,
                                     )
                                     if asset and asset.gcs_uri:
                                         lyria_reference_images.append(
@@ -627,8 +632,8 @@ def _process_audio_in_background(
                                 for (
                                     ref_item
                                 ) in request_dto.reference_media_items:
-                                    parent_item = await media_repo.get_by_id(
-                                        ref_item.media_item_id,
+                                    parent_item = await owned_media_item(
+                                        media_repo, ref_item.media_item_id, request_dto.workspace_id,
                                     )
                                     if (
                                         parent_item
@@ -1023,6 +1028,7 @@ class AudioService:
             request_dto,
             user.email,
             user.id,
+            user,  # OWNERSHIP_CHECK_V1
         )
 
         return MediaItemResponse(

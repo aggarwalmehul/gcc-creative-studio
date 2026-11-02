@@ -87,6 +87,10 @@ from src.multimodal.gemini_service import GeminiService, PromptTargetEnum
 from src.source_assets.repository.source_asset_repository import (
     SourceAssetRepository,
 )
+from src.common.workspace_ownership import (
+    owned_media_item,
+    owned_source_asset,
+)  # OWNERSHIP_CHECK_V1
 from src.users.user_model import UserModel
 from src.videos.dto.concatenate_videos_dto import ConcatenateVideosDto
 from src.videos.dto.create_veo_dto import CreateVeoDto
@@ -128,6 +132,7 @@ def _process_video_in_background(
     media_item_id: int,
     request_dto: CreateVeoDto,
     user_email: str,
+    user: UserModel,  # OWNERSHIP_CHECK_V1
 ):  # type: ignore
     """This is the long-running worker task.
 
@@ -234,15 +239,17 @@ def _process_video_in_background(
                         if request_dto.source_video_asset_id:
                             ref = request_dto.source_video_asset_id
                             if ref.type == "media_item":
-                                parent_item = await media_repo.get_by_id(ref.id)
+                                parent_item = await owned_media_item(
+                                    media_repo, ref.id, request_dto.workspace_id
+                                )
                                 if parent_item and parent_item.gcs_uris:
                                     source_video_for_api = types.Video(
                                         uri=parent_item.gcs_uris[0],
                                         mime_type=parent_item.mime_type,
                                     )
                             else:
-                                video_asset = await source_asset_repo.get_by_id(
-                                    ref.id
+                                video_asset = await owned_source_asset(
+                                    source_asset_repo, ref.id, user
                                 )
                                 if video_asset:
                                     source_video_for_api = types.Video(
@@ -257,15 +264,17 @@ def _process_video_in_background(
                         if request_dto.start_image_asset_id:
                             ref = request_dto.start_image_asset_id
                             if ref.type == "media_item":
-                                parent_item = await media_repo.get_by_id(ref.id)
+                                parent_item = await owned_media_item(
+                                    media_repo, ref.id, request_dto.workspace_id
+                                )
                                 if parent_item and parent_item.gcs_uris:
                                     start_image_for_api = types.Image(
                                         gcs_uri=parent_item.gcs_uris[0],
                                         mime_type=parent_item.mime_type,
                                     )
                             else:
-                                start_asset = await source_asset_repo.get_by_id(
-                                    ref.id
+                                start_asset = await owned_source_asset(
+                                    source_asset_repo, ref.id, user
                                 )
                                 if start_asset:
                                     start_image_for_api = types.Image(
@@ -276,15 +285,17 @@ def _process_video_in_background(
                         if request_dto.end_image_asset_id:
                             ref = request_dto.end_image_asset_id
                             if ref.type == "media_item":
-                                parent_item = await media_repo.get_by_id(ref.id)
+                                parent_item = await owned_media_item(
+                                    media_repo, ref.id, request_dto.workspace_id
+                                )
                                 if parent_item and parent_item.gcs_uris:
                                     end_image_for_api = types.Image(
                                         gcs_uri=parent_item.gcs_uris[0],
                                         mime_type=parent_item.mime_type,
                                     )
                             else:
-                                end_asset = await source_asset_repo.get_by_id(
-                                    ref.id
+                                end_asset = await owned_source_asset(
+                                    source_asset_repo, ref.id, user
                                 )
                                 if end_asset:
                                     end_image_for_api = types.Image(
@@ -298,8 +309,8 @@ def _process_video_in_background(
                                 len(request_dto.reference_images),
                             )
                             for ref_dto in request_dto.reference_images:
-                                asset = await source_asset_repo.get_by_id(
-                                    ref_dto.asset_id,
+                                asset = await owned_source_asset(
+                                    source_asset_repo, ref_dto.asset_id, user
                                 )
                                 if asset and asset.gcs_uri:
                                     image = types.Image(
@@ -335,8 +346,8 @@ def _process_video_in_background(
                         # --- Handle Generated Inputs for Media Items (start/end frames, source video, and references) ---
                         if request_dto.source_media_items:
                             for gen_input in request_dto.source_media_items:
-                                parent_item = await media_repo.get_by_id(
-                                    gen_input.media_item_id,
+                                parent_item = await owned_media_item(
+                                    media_repo, gen_input.media_item_id, request_dto.workspace_id
                                 )
                                 if (
                                     parent_item
@@ -442,8 +453,8 @@ def _process_video_in_background(
                             if request_dto.reference_video:
                                 ref = request_dto.reference_video
                                 if ref.type == "media_item":
-                                    parent_item = await media_repo.get_by_id(
-                                        ref.id
+                                    parent_item = await owned_media_item(
+                                        media_repo, ref.id, request_dto.workspace_id
                                     )
                                     if parent_item and parent_item.gcs_uris:
                                         index = ref.index or 0
@@ -460,10 +471,8 @@ def _process_video_in_background(
                                                 parent_item.gcs_uris[0]
                                             )
                                 else:
-                                    video_asset = (
-                                        await source_asset_repo.get_by_id(
-                                            ref.id
-                                        )
+                                    video_asset = await owned_source_asset(
+                                        source_asset_repo, ref.id, user
                                     )
                                     if video_asset:
                                         ref_video_uri = video_asset.gcs_uri
@@ -472,8 +481,8 @@ def _process_video_in_background(
                             if request_dto.reference_audio:
                                 ref = request_dto.reference_audio
                                 if ref.type == "media_item":
-                                    parent_item = await media_repo.get_by_id(
-                                        ref.id
+                                    parent_item = await owned_media_item(
+                                        media_repo, ref.id, request_dto.workspace_id
                                     )
                                     if parent_item and parent_item.gcs_uris:
                                         index = ref.index or 0
@@ -490,10 +499,8 @@ def _process_video_in_background(
                                                 parent_item.gcs_uris[0]
                                             )
                                 else:
-                                    audio_asset = (
-                                        await source_asset_repo.get_by_id(
-                                            ref.id
-                                        )
+                                    audio_asset = await owned_source_asset(
+                                        source_asset_repo, ref.id, user
                                     )
                                     if audio_asset:
                                         ref_audio_uri = audio_asset.gcs_uri
@@ -501,8 +508,8 @@ def _process_video_in_background(
                             # Check for Turn 2 conversational input context
                             is_turn_2 = False
                             if request_dto.parent_media_item_id:
-                                parent_media_item = await media_repo.get_by_id(
-                                    request_dto.parent_media_item_id
+                                parent_media_item = await owned_media_item(
+                                    media_repo, request_dto.parent_media_item_id, request_dto.workspace_id
                                 )
                                 if (
                                     parent_media_item
@@ -1251,6 +1258,7 @@ def _process_video_concatenation_in_background(
     media_item_id: int,
     request_dto: ConcatenateVideosDto,
     user_email: str | None = None,  # VIDEO_CONCAT_CONTEXTVAR_FIX_V1
+    user: UserModel | None = None,  # OWNERSHIP_CHECK_V1
 ):
     """Background worker to concatenate multiple videos."""
     # pylint: disable=import-outside-toplevel
@@ -1305,8 +1313,8 @@ def _process_video_concatenation_in_background(
                         for video_input in request_dto.inputs:
                             gcs_uri: str | None = None
                             if video_input.type == "media_item":
-                                item = await media_repo.get_by_id(
-                                    video_input.id
+                                item = await owned_media_item(
+                                    media_repo, video_input.id, request_dto.workspace_id
                                 )
                                 if not item or not item.gcs_uris:
                                     raise ValueError(
@@ -1314,8 +1322,8 @@ def _process_video_concatenation_in_background(
                                     )
                                 gcs_uri = item.gcs_uris[0]
                             elif video_input.type == "source_asset":
-                                asset = await source_asset_repo.get_by_id(
-                                    video_input.id,
+                                asset = await owned_source_asset(
+                                    source_asset_repo, video_input.id, user
                                 )
                                 if not asset or not asset.gcs_uri:
                                     raise ValueError(
@@ -1618,6 +1626,7 @@ class VeoService:
             media_item_id=placeholder_item.id,
             request_dto=request_dto,
             user_email=user.email,
+            user=user,  # OWNERSHIP_CHECK_V1
         )
 
         logger.info(
@@ -1652,7 +1661,9 @@ class VeoService:
 
         for video_input in request_dto.inputs:
             if video_input.type == "media_item":
-                item = await self.media_repo.get_by_id(video_input.id)
+                item = await owned_media_item(
+                    self.media_repo, video_input.id, request_dto.workspace_id
+                )
                 if not item or item.mime_type != MimeTypeEnum.VIDEO_MP4:
                     raise HTTPException(
                         status_code=400,
@@ -1666,7 +1677,9 @@ class VeoService:
                     ),
                 )
             elif video_input.type == "source_asset":
-                asset = await self.source_asset_repo.get_by_id(video_input.id)
+                asset = await owned_source_asset(
+                    self.source_asset_repo, video_input.id, user
+                )
                 if not asset or asset.mime_type != MimeTypeEnum.VIDEO_MP4:
                     raise HTTPException(
                         status_code=400,
@@ -1715,6 +1728,7 @@ class VeoService:
             media_item_id=placeholder_item.id,
             request_dto=request_dto,
             user_email=user.email,  # VIDEO_CONCAT_CONTEXTVAR_FIX_V1
+            user=user,  # OWNERSHIP_CHECK_V1
         )
 
         logger.info("Video concatenation job queued: %s", placeholder_item.id)
