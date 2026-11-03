@@ -20,6 +20,7 @@ from google.genai import types
 from httpx import AsyncClient as RestClient
 
 from src.common.schema.genai_model_setup import GenAIModelSetup
+from src.common.token_logger import log_tokens
 from src.common.schema.media_item_model import AssetRoleEnum
 from src.config.config_service import config_service
 from src.workflows.schema.workflow_model import ReferenceMediaOrAsset
@@ -279,6 +280,7 @@ class WorkflowsExecutorService:
             contents.extend(video_parts)
 
         text = ""
+        last_chunk = None
         # Note: The original code used a stream but returned the full text at the end.
         # Keeping this behavior for now.
         for chunk in self.genai_client.models.generate_content_stream(
@@ -288,6 +290,15 @@ class WorkflowsExecutorService:
         ):
             if chunk.text:
                 text += chunk.text
+            last_chunk = chunk
+        # TOKEN_LOGGING_WORKFLOWS_EXECUTOR_V1: usage_metadata on a streamed
+        # response is only populated on the final chunk, so log from
+        # last_chunk here rather than from each individual chunk.
+        if last_chunk is not None:
+            try:
+                log_tokens("creative-studio", request.config.model, last_chunk)
+            except Exception as e:
+                logger.warning("Failed to log tokens for workflows generate_text: %s", e)
         return {"generated_text": text}
 
     async def generate_image(
