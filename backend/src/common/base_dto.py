@@ -69,6 +69,7 @@ class GenerationModelEnum(str, Enum):
     GEMINI_3_1_PRO_PREVIEW = "gemini-3.1-pro-preview"
     GEMINI_3_1_FLASH_PREVIEW = "gemini-3.1-flash-preview"
     GEMINI_3_1_FLASH_LITE_PREVIEW = "gemini-3.1-flash-lite-preview"
+    GEMINI_4_ARGON = "gemini-4-argon"  # ARGON_CS_PILOT_V1 (2 Nov): Workflows Generate Text node only
 
     # Video-Specific Models
     GEMINI_OMNI = "gemini-omni-generate-preview"
