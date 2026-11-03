@@ -57,6 +57,7 @@ logger = logging.getLogger(__name__)
 PROJECT_ID = config_service.PROJECT_ID
 LOCATION = config_service.WORKFLOWS_LOCATION
 BACKEND_EXECUTOR_URL = config_service.WORKFLOWS_EXECUTOR_URL
+logger.warning("ARGON_DEBUG: BACKEND_EXECUTOR_URL resolved to: %s", BACKEND_EXECUTOR_URL)
 
 
 class WorkflowService:
