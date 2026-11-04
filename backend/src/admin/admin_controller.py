@@ -23,6 +23,7 @@ from src.admin.dto.admin_response_dto import (
     AdminActiveRole,
     AdminGenerationHealth,
     AdminMonthlyActiveUsers,
+    AdminTokenUsageRow,
 )
 
 router = APIRouter(
@@ -132,3 +133,15 @@ async def cleanup_stuck_jobs(admin_service: AdminService = Depends()):
     """
     count = await admin_service.cleanup_stuck_jobs()
     return {"message": f"Cleaned up {count} stuck jobs", "count": count}
+
+
+@router.get("/token-usage", response_model=list[AdminTokenUsageRow])
+async def get_token_usage(
+    days: int = 7,
+    admin_service: AdminService = Depends(),
+):
+    """Retrieves recent token usage rows across all platforms (Creative
+    Studio, Genflow, Izumi) from the shared BigQuery usage table. Already
+    gated by the router-level RoleChecker(ADMIN) dependency above.
+    """
+    return await admin_service.get_token_usage(days=days)

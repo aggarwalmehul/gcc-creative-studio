@@ -16,6 +16,7 @@ from fastapi import Depends
 from datetime import datetime, timedelta
 from src.admin.repository.admin_repository import AdminRepository
 from src.admin.dto.admin_response_dto import (
+    AdminTokenUsageRow,
     AdminOverviewStats,
     AdminMediaOverTime,
     AdminWorkspaceStats,
@@ -86,3 +87,40 @@ class AdminService:
 
     async def cleanup_stuck_jobs(self) -> int:
         return await self.admin_repo.cleanup_stuck_jobs()
+
+
+    async def get_token_usage(self, days: int = 7) -> list[AdminTokenUsageRow]:
+        """Returns recent token usage rows from BigQuery, newest first.
+
+        TOKEN_USAGE_ADMIN_PAGE_V1: a first, deliberately simple version --
+        just the raw rows already logged by log_tokens() (see
+        src/common/token_logger.py). Grouping/charts/cost estimates (via
+        pricing.json) are left for a later iteration. Uses its own
+        BigQuery client directly, since AdminRepository is Postgres-only
+        and this is the first admin endpoint to read a different system.
+        """
+        from google.cloud import bigquery
+        client = bigquery.Client(project="ltm-craftstudio-poc")
+        query = """
+            SELECT timestamp, platform, user_email, model, total
+            FROM `ltm-craftstudio-poc.token_usage.usage`
+            WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days DAY)
+            ORDER BY timestamp DESC
+            LIMIT 500
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("days", "INT64", days),
+            ]
+        )
+        rows = client.query(query, job_config=job_config).result()
+        return [
+            AdminTokenUsageRow(
+                timestamp=row["timestamp"].isoformat(),
+                platform=row["platform"] or "unknown",
+                user_email=row["user_email"] or "unknown",
+                model=row["model"] or "unknown",
+                total=int(row["total"] or 0),
+            )
+            for row in rows
+        ]

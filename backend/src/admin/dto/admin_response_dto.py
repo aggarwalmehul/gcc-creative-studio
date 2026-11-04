@@ -56,3 +56,11 @@ class AdminGenerationHealth(BaseDto):
 class AdminMonthlyActiveUsers(BaseDto):
     month: str
     count: int
+
+
+class AdminTokenUsageRow(BaseDto):
+    timestamp: str
+    platform: str
+    user_email: str
+    model: str
+    total: int
