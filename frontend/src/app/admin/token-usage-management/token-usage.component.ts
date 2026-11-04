@@ -18,6 +18,7 @@ import {Component, OnInit, AfterViewInit, ViewChild, ElementRef} from '@angular/
 import {MatTableDataSource} from '@angular/material/table';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import {forkJoin} from 'rxjs';
+import * as d3 from 'd3';
 import {
   TokenUsageService,
   TokenUsageRowV2,
@@ -86,9 +87,7 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
     this.loadAll();
   }
 
-  ngAfterViewInit(): void {
-    // Chart rendering (Stage 3) hooks in here once the view is ready.
-  }
+  ngAfterViewInit(): void {}
 
   get grandTotalCostUsd(): number {
     const tokenCost = this.summary?.totalCostUsd || 0;
@@ -115,7 +114,7 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
         this.summary = summary;
         this.billingUnits = billingUnits;
         this.isLoading = false;
-        // Stage 3 will call the D3 render function here.
+        setTimeout(() => this.renderDailyChart(summary.daily), 0);
       },
       error: err => {
         console.error('Failed to load token usage dashboard', err);
@@ -125,5 +124,136 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
         this.isLoading = false;
       },
     });
+  }
+
+  private showNoDataMessage(element: HTMLElement): void {
+    d3.select(element).selectAll('*').remove();
+    d3.select(element)
+      .append('div')
+      .attr('class', 'text-center py-8 text-neutral-400')
+      .text('No daily data for this range.');
+  }
+
+  private renderDailyChart(data: {date: string; tokens: number; costUsd: number}[]): void {
+    if (!this.dailyChartContainer) return;
+    const element = this.dailyChartContainer.nativeElement;
+    if (data.length === 0) {
+      this.showNoDataMessage(element);
+      return;
+    }
+    d3.select(element).selectAll('*').remove();
+
+    const margin = {top: 20, right: 40, bottom: 60, left: 60};
+    const width = element.offsetWidth - margin.left - margin.right;
+    const height = 350 - margin.top - margin.bottom;
+
+    const svg = d3
+      .select(element)
+      .append('svg')
+      .attr('width', width + margin.left + margin.right)
+      .attr('height', height + margin.top + margin.bottom)
+      .append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const x = d3
+      .scaleBand()
+      .domain(data.map(d => d.date))
+      .range([0, width])
+      .padding(0.2);
+
+    const y = d3
+      .scaleLinear()
+      .domain([0, d3.max(data, d => d.costUsd) || 0])
+      .nice()
+      .range([height, 0]);
+
+    d3.select('body').selectAll('.token-usage-chart-tooltip').remove();
+    const tooltip = d3
+      .select('body')
+      .append('div')
+      .attr(
+        'class',
+        'token-usage-chart-tooltip absolute bg-zinc-800 text-white border border-zinc-700 rounded px-2 py-1 opacity-0 pointer-events-none text-sm',
+      )
+      .style('z-index', '1000');
+
+    const area = d3
+      .area<{date: string; tokens: number; costUsd: number}>()
+      .x(d => x(d.date)! + x.bandwidth() / 2)
+      .y0(height)
+      .y1(d => y(d.costUsd));
+
+    svg
+      .append('path')
+      .datum(data)
+      .attr('d', area)
+      .style('fill', '#3b82f6')
+      .style('opacity', 0.8);
+
+    const hoverLine = svg
+      .append('line')
+      .attr('y1', 0)
+      .attr('y2', height)
+      .style('stroke', '#9ca3af')
+      .style('stroke-width', '1px')
+      .style('stroke-dasharray', '3, 3')
+      .style('opacity', 0);
+
+    svg
+      .selectAll('.hover-rect')
+      .data(data)
+      .join('rect')
+      .attr('class', 'hover-rect')
+      .attr('x', d => x(d.date)!)
+      .attr('width', x.bandwidth())
+      .attr('y', 0)
+      .attr('height', height)
+      .style('fill', 'transparent')
+      .style('pointer-events', 'all')
+      .style('cursor', 'pointer')
+      .on('mouseover', () => {
+        tooltip.style('opacity', 1);
+        hoverLine.style('opacity', 1);
+      })
+      .on('mousemove', (event, d) => {
+        const xPos = x(d.date)! + x.bandwidth() / 2;
+        hoverLine.attr('x1', xPos).attr('x2', xPos);
+        tooltip
+          .html(
+            `<div class="font-bold mb-1">${d.date}</div>` +
+              `<div>Cost: $${d.costUsd.toFixed(4)}</div>` +
+              `<div>Tokens: ${d.tokens.toLocaleString()}</div>`,
+          )
+          .style('left', event.pageX + 15 + 'px')
+          .style('top', event.pageY - 28 + 'px');
+      })
+      .on('mouseleave', () => {
+        tooltip.style('opacity', 0);
+        hoverLine.style('opacity', 0);
+      });
+
+    svg
+      .append('g')
+      .attr('transform', `translate(0,${height})`)
+      .call(
+        d3.axisBottom(x).tickFormat((d: string) => {
+          const parseTime = d3.timeParse('%Y-%m-%d');
+          const date = parseTime(d);
+          if (!date) return d;
+          const currentYear = new Date().getFullYear();
+          if (date.getFullYear() === currentYear) {
+            return d3.timeFormat('%b %d')(date);
+          }
+          return d3.timeFormat('%b %d, %Y')(date);
+        }),
+      )
+      .selectAll('text')
+      .style('fill', '#9ca3af');
+
+    svg
+      .append('g')
+      .call(d3.axisLeft(y).tickFormat(d => `$${d}`))
+      .selectAll('text')
+      .style('fill', '#9ca3af');
   }
 }
