@@ -24,6 +24,9 @@ from src.admin.dto.admin_response_dto import (
     AdminGenerationHealth,
     AdminMonthlyActiveUsers,
     AdminTokenUsageRow,
+    AdminTokenUsageRowV2,
+    AdminTokenUsageSummary,
+    AdminBillingUnitsSummary,
 )
 
 router = APIRouter(
@@ -145,3 +148,35 @@ async def get_token_usage(
     gated by the router-level RoleChecker(ADMIN) dependency above.
     """
     return await admin_service.get_token_usage(days=days)
+
+
+@router.get("/token-usage/v2", response_model=list[AdminTokenUsageRowV2])
+async def get_token_usage_v2(
+    start_date: str,
+    end_date: str,
+    admin_service: AdminService = Depends(),
+):
+    """Raw usage rows for a date range, each with its cost in USD."""
+    return await admin_service.get_token_usage_v2(start_date=start_date, end_date=end_date)
+
+
+@router.get("/token-usage/summary", response_model=AdminTokenUsageSummary)
+async def get_token_usage_summary(
+    start_date: str,
+    end_date: str,
+    admin_service: AdminService = Depends(),
+):
+    """Daily / per-model / per-user token usage and cost aggregates."""
+    return await admin_service.get_token_usage_summary(start_date=start_date, end_date=end_date)
+
+
+@router.get("/token-usage/billing-units", response_model=AdminBillingUnitsSummary)
+async def get_billing_units_summary(
+    start_date: str,
+    end_date: str,
+    admin_service: AdminService = Depends(),
+):
+    """Native-unit media costs (Veo/Chirp/Lyria) for a date range --
+    separate from token-based usage above.
+    """
+    return await admin_service.get_billing_units_summary(start_date=start_date, end_date=end_date)

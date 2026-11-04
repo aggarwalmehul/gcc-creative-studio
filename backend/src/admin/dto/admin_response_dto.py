@@ -64,3 +64,57 @@ class AdminTokenUsageRow(BaseDto):
     user_email: str
     model: str
     total: int
+
+
+class AdminTokenUsageRowV2(BaseDto):
+    timestamp: str
+    platform: str
+    user_email: str
+    model: str
+    tokens_in: int
+    tokens_out: int
+    total: int
+    cost_usd: float
+
+
+class AdminTokenUsageDailyPoint(BaseDto):
+    date: str
+    tokens: int
+    cost_usd: float
+
+
+class AdminTokenUsageByModel(BaseDto):
+    model: str
+    tokens: int
+    cost_usd: float
+    calls: int
+
+
+class AdminTokenUsageByUser(BaseDto):
+    user_email: str
+    tokens: int
+    cost_usd: float
+    calls: int
+
+
+class AdminTokenUsageSummary(BaseDto):
+    total_tokens: int
+    total_cost_usd: float
+    total_calls: int
+    daily: list[AdminTokenUsageDailyPoint]
+    by_model: list[AdminTokenUsageByModel]
+    by_user: list[AdminTokenUsageByUser]
+
+
+class AdminBillingUnitRow(BaseDto):
+    platform: str
+    model: str
+    unit_type: str
+    quantity: float
+    cost_usd: float
+    calls: int
+
+
+class AdminBillingUnitsSummary(BaseDto):
+    total_cost_usd: float
+    rows: list[AdminBillingUnitRow]
