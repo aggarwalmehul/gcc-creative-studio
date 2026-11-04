@@ -137,13 +137,8 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
   }
 
   private renderDailyChart(data: {date: string; tokens: number; costUsd: number}[]): void {
-    console.log('DEBUG renderDailyChart called. dailyChartContainer:', this.dailyChartContainer, 'data.length:', data.length, 'data:', data);
-    if (!this.dailyChartContainer) {
-      console.log('DEBUG: dailyChartContainer is falsy, bailing out');
-      return;
-    }
+    if (!this.dailyChartContainer) return;
     const element = this.dailyChartContainer.nativeElement;
-    console.log('DEBUG: element:', element, 'offsetWidth:', element.offsetWidth);
     if (data.length === 0) {
       this.showNoDataMessage(element);
       return;
