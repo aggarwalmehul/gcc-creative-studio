@@ -15,48 +15,207 @@
 -->
 
 <div class="p-6 text-white min-h-screen">
-  <div class="flex justify-between items-center mb-6">
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
     <h1 class="text-2xl font-bold">Token Usage</h1>
+
+    <div class="flex items-end gap-3">
+      <mat-form-field appearance="fill" class="w-40">
+        <mat-label>Start date</mat-label>
+        <input
+          matInput
+          [matDatepicker]="startPicker"
+          [(ngModel)]="startDate"
+          (dateChange)="onDateRangeChange()"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+        <mat-datepicker #startPicker></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="w-40">
+        <mat-label>End date</mat-label>
+        <input
+          matInput
+          [matDatepicker]="endPicker"
+          [(ngModel)]="endDate"
+          (dateChange)="onDateRangeChange()"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+        <mat-datepicker #endPicker></mat-datepicker>
+      </mat-form-field>
+    </div>
   </div>
 
   <div *ngIf="isLoading" class="flex justify-center py-8">
     <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
   </div>
 
-  <div *ngIf="!isLoading && dataSource.data.length > 0" class="overflow-hidden rounded-lg border border-neutral-800">
-    <table mat-table [dataSource]="dataSource" class="min-w-full divide-y divide-neutral-800 bg-neutral-950">
+  <div *ngIf="!isLoading">
 
-      <ng-container matColumnDef="timestamp">
-        <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">Timestamp</th>
-        <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">{{ row.timestamp }}</td>
-      </ng-container>
+    <!-- Grand total summary card -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div class="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+        <div class="text-xs text-neutral-400 uppercase tracking-wider">Grand Total Cost</div>
+        <div class="text-2xl font-bold mt-1">${{ grandTotalCostUsd | number:'1.2-2' }}</div>
+      </div>
+      <div class="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+        <div class="text-xs text-neutral-400 uppercase tracking-wider">Token-Based Cost</div>
+        <div class="text-2xl font-bold mt-1">${{ (summary?.totalCostUsd || 0) | number:'1.2-2' }}</div>
+      </div>
+      <div class="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+        <div class="text-xs text-neutral-400 uppercase tracking-wider">Media Generation Cost</div>
+        <div class="text-2xl font-bold mt-1">${{ (billingUnits?.totalCostUsd || 0) | number:'1.2-2' }}</div>
+      </div>
+    </div>
 
-      <ng-container matColumnDef="platform">
-        <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">Platform</th>
-        <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">{{ row.platform }}</td>
-      </ng-container>
+    <!-- ===== Section 1: Token-based usage ===== -->
+    <h2 class="text-lg font-semibold mb-3 text-neutral-200">Token-Based Usage</h2>
 
-      <ng-container matColumnDef="userEmail">
-        <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">User</th>
-        <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">{{ row.userEmail }}</td>
-      </ng-container>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+      <div class="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+        <div class="text-xs text-neutral-400 uppercase tracking-wider">Total Tokens</div>
+        <div class="text-xl font-bold mt-1">{{ (summary?.totalTokens || 0) | number }}</div>
+      </div>
+      <div class="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+        <div class="text-xs text-neutral-400 uppercase tracking-wider">Total Calls</div>
+        <div class="text-xl font-bold mt-1">{{ (summary?.totalCalls || 0) | number }}</div>
+      </div>
+      <div class="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+        <div class="text-xs text-neutral-400 uppercase tracking-wider">Cost</div>
+        <div class="text-xl font-bold mt-1">${{ (summary?.totalCostUsd || 0) | number:'1.2-2' }}</div>
+      </div>
+    </div>
 
-      <ng-container matColumnDef="model">
-        <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">Model</th>
-        <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">{{ row.model }}</td>
-      </ng-container>
+    <!-- Daily chart container (Stage 3) -->
+    <div class="mb-6 rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+      <div class="text-sm text-neutral-400 mb-2">Daily Cost Trend</div>
+      <div #dailyChartContainer style="width:100%; min-height: 350px;"></div>
+    </div>
 
-      <ng-container matColumnDef="total">
-        <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">Total Tokens</th>
-        <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">{{ row.total }}</td>
-      </ng-container>
+    <!-- By model / by user breakdown tables -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+      <div class="overflow-hidden rounded-lg border border-neutral-800">
+        <div class="px-4 py-2 text-sm font-semibold bg-neutral-900 text-neutral-200">By Model</div>
+        <table mat-table [dataSource]="summary?.byModel || []" class="min-w-full divide-y divide-neutral-800 bg-neutral-950">
+          <ng-container matColumnDef="model">
+            <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Model</th>
+            <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.model }}</td>
+          </ng-container>
+          <ng-container matColumnDef="tokens">
+            <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Tokens</th>
+            <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.tokens | number }}</td>
+          </ng-container>
+          <ng-container matColumnDef="calls">
+            <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Calls</th>
+            <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.calls }}</td>
+          </ng-container>
+          <ng-container matColumnDef="costUsd">
+            <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Cost</th>
+            <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">${{ row.costUsd | number:'1.2-4' }}</td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="byModelDisplayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: byModelDisplayedColumns;"></tr>
+        </table>
+      </div>
 
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-    </table>
-  </div>
+      <div class="overflow-hidden rounded-lg border border-neutral-800">
+        <div class="px-4 py-2 text-sm font-semibold bg-neutral-900 text-neutral-200">By User</div>
+        <table mat-table [dataSource]="summary?.byUser || []" class="min-w-full divide-y divide-neutral-800 bg-neutral-950">
+          <ng-container matColumnDef="userEmail">
+            <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">User</th>
+            <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.userEmail }}</td>
+          </ng-container>
+          <ng-container matColumnDef="tokens">
+            <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Tokens</th>
+            <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.tokens | number }}</td>
+          </ng-container>
+          <ng-container matColumnDef="calls">
+            <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Calls</th>
+            <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.calls }}</td>
+          </ng-container>
+          <ng-container matColumnDef="costUsd">
+            <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Cost</th>
+            <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">${{ row.costUsd | number:'1.2-4' }}</td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="byUserDisplayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: byUserDisplayedColumns;"></tr>
+        </table>
+      </div>
+    </div>
 
-  <div *ngIf="!isLoading && dataSource.data.length === 0" class="text-center py-8 text-neutral-400">
-    <p>No token usage recorded in this window.</p>
+    <!-- ===== Section 2: Media generation (Veo/Audio/Music) ===== -->
+    <h2 class="text-lg font-semibold mb-3 text-neutral-200">Media Generation (Veo / Audio / Music)</h2>
+
+    <div class="overflow-hidden rounded-lg border border-neutral-800 mb-8">
+      <table mat-table [dataSource]="billingUnits?.rows || []" class="min-w-full divide-y divide-neutral-800 bg-neutral-950">
+        <ng-container matColumnDef="platform">
+          <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Platform</th>
+          <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.platform }}</td>
+        </ng-container>
+        <ng-container matColumnDef="model">
+          <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Model</th>
+          <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.model }}</td>
+        </ng-container>
+        <ng-container matColumnDef="unitType">
+          <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Unit</th>
+          <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.unitType }}</td>
+        </ng-container>
+        <ng-container matColumnDef="quantity">
+          <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Quantity</th>
+          <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.quantity | number:'1.0-2' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="calls">
+          <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Calls</th>
+          <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">{{ row.calls }}</td>
+        </ng-container>
+        <ng-container matColumnDef="costUsd">
+          <th mat-header-cell *matHeaderCellDef class="px-4 py-2 text-left text-xs text-neutral-400 uppercase">Cost</th>
+          <td mat-cell *matCellDef="let row" class="px-4 py-2 text-sm text-neutral-300">${{ row.costUsd | number:'1.2-4' }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="billingUnitsDisplayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: billingUnitsDisplayedColumns;"></tr>
+      </table>
+      <div *ngIf="(billingUnits?.rows?.length || 0) === 0" class="text-center py-6 text-neutral-400">
+        <p>No media generation usage recorded in this range.</p>
+      </div>
+    </div>
+
+    <!-- ===== Detail view: raw rows ===== -->
+    <h2 class="text-lg font-semibold mb-3 text-neutral-200">Detail</h2>
+
+    <div *ngIf="detailDataSource.data.length > 0" class="overflow-hidden rounded-lg border border-neutral-800">
+      <table mat-table [dataSource]="detailDataSource" class="min-w-full divide-y divide-neutral-800 bg-neutral-950">
+        <ng-container matColumnDef="timestamp">
+          <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">Timestamp</th>
+          <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">{{ row.timestamp }}</td>
+        </ng-container>
+        <ng-container matColumnDef="platform">
+          <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">Platform</th>
+          <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">{{ row.platform }}</td>
+        </ng-container>
+        <ng-container matColumnDef="userEmail">
+          <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">User</th>
+          <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">{{ row.userEmail }}</td>
+        </ng-container>
+        <ng-container matColumnDef="model">
+          <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">Model</th>
+          <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">{{ row.model }}</td>
+        </ng-container>
+        <ng-container matColumnDef="total">
+          <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">Total Tokens</th>
+          <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">{{ row.total | number }}</td>
+        </ng-container>
+        <ng-container matColumnDef="costUsd">
+          <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">Cost</th>
+          <td mat-cell *matCellDef="let row" class="px-6 py-4 whitespace-nowrap text-sm text-neutral-300">${{ row.costUsd | number:'1.2-4' }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="detailDisplayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: detailDisplayedColumns;"></tr>
+      </table>
+    </div>
+
+    <div *ngIf="detailDataSource.data.length === 0" class="text-center py-8 text-neutral-400">
+      <p>No token usage recorded in this range.</p>
+    </div>
+
   </div>
 </div>

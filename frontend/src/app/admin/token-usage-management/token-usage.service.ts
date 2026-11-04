@@ -20,12 +20,58 @@ import {Observable, throwError} from 'rxjs';
 import {catchError} from 'rxjs/operators';
 import {environment} from '../../../environments/environment';
 
-export interface TokenUsageRow {
+export interface TokenUsageRowV2 {
   timestamp: string;
   platform: string;
   userEmail: string;
   model: string;
+  tokensIn: number;
+  tokensOut: number;
   total: number;
+  costUsd: number;
+}
+
+export interface TokenUsageDailyPoint {
+  date: string;
+  tokens: number;
+  costUsd: number;
+}
+
+export interface TokenUsageByModel {
+  model: string;
+  tokens: number;
+  costUsd: number;
+  calls: number;
+}
+
+export interface TokenUsageByUser {
+  userEmail: string;
+  tokens: number;
+  costUsd: number;
+  calls: number;
+}
+
+export interface TokenUsageSummary {
+  totalTokens: number;
+  totalCostUsd: number;
+  totalCalls: number;
+  daily: TokenUsageDailyPoint[];
+  byModel: TokenUsageByModel[];
+  byUser: TokenUsageByUser[];
+}
+
+export interface BillingUnitRow {
+  platform: string;
+  model: string;
+  unitType: string;
+  quantity: number;
+  costUsd: number;
+  calls: number;
+}
+
+export interface BillingUnitsSummary {
+  totalCostUsd: number;
+  rows: BillingUnitRow[];
 }
 
 @Injectable({
@@ -36,12 +82,28 @@ export class TokenUsageService {
 
   constructor(private http: HttpClient) {}
 
-  // TOKEN_USAGE_ADMIN_PAGE_V1: a first, simple read-only view over the
-  // shared BigQuery usage table. Grouping/charts/cost estimates deferred
-  // to a later iteration.
-  getTokenUsage(days = 7): Observable<TokenUsageRow[]> {
+  // TOKEN_USAGE_DASHBOARD_V2: date-range-scoped raw rows, no row limit, each with cost.
+  getTokenUsageV2(startDate: string, endDate: string): Observable<TokenUsageRowV2[]> {
     return this.http
-      .get<TokenUsageRow[]>(`${this.apiUrl}?days=${days}`)
+      .get<TokenUsageRowV2[]>(
+        `${this.apiUrl}/v2?start_date=${startDate}&end_date=${endDate}`,
+      )
+      .pipe(catchError(this.handleError));
+  }
+
+  getTokenUsageSummary(startDate: string, endDate: string): Observable<TokenUsageSummary> {
+    return this.http
+      .get<TokenUsageSummary>(
+        `${this.apiUrl}/summary?start_date=${startDate}&end_date=${endDate}`,
+      )
+      .pipe(catchError(this.handleError));
+  }
+
+  getBillingUnitsSummary(startDate: string, endDate: string): Observable<BillingUnitsSummary> {
+    return this.http
+      .get<BillingUnitsSummary>(
+        `${this.apiUrl}/billing-units?start_date=${startDate}&end_date=${endDate}`,
+      )
       .pipe(catchError(this.handleError));
   }
 
