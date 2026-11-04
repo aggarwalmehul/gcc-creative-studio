@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {Component, OnInit, AfterViewInit, ViewChild, ElementRef} from '@angular/core';
+import {Component, OnInit, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef} from '@angular/core';
 import {MatTableDataSource} from '@angular/material/table';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import {forkJoin} from 'rxjs';
@@ -81,6 +81,7 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
   constructor(
     private tokenUsageService: TokenUsageService,
     private snackBar: MatSnackBar,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
@@ -114,7 +115,8 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
         this.summary = summary;
         this.billingUnits = billingUnits;
         this.isLoading = false;
-        setTimeout(() => this.renderDailyChart(summary.daily), 0);
+        this.cdr.detectChanges();
+        this.renderDailyChart(summary.daily);
       },
       error: err => {
         console.error('Failed to load token usage dashboard', err);
@@ -135,8 +137,13 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
   }
 
   private renderDailyChart(data: {date: string; tokens: number; costUsd: number}[]): void {
-    if (!this.dailyChartContainer) return;
+    console.log('DEBUG renderDailyChart called. dailyChartContainer:', this.dailyChartContainer, 'data.length:', data.length, 'data:', data);
+    if (!this.dailyChartContainer) {
+      console.log('DEBUG: dailyChartContainer is falsy, bailing out');
+      return;
+    }
     const element = this.dailyChartContainer.nativeElement;
+    console.log('DEBUG: element:', element, 'offsetWidth:', element.offsetWidth);
     if (data.length === 0) {
       this.showNoDataMessage(element);
       return;
