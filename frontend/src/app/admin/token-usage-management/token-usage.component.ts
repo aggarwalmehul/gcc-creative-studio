@@ -16,6 +16,7 @@
 
 import {Component, OnInit, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef} from '@angular/core';
 import {MatTableDataSource} from '@angular/material/table';
+import {MatPaginator} from '@angular/material/paginator';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import {forkJoin} from 'rxjs';
 import * as d3 from 'd3';
@@ -40,6 +41,7 @@ function toIsoDate(d: Date): string {
 })
 export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
   @ViewChild('dailyChartContainer') dailyChartContainer!: ElementRef;
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
 
   isLoading = false;
 
@@ -88,7 +90,9 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
     this.loadAll();
   }
 
-  ngAfterViewInit(): void {}
+  ngAfterViewInit(): void {
+    this.detailDataSource.paginator = this.paginator;
+  }
 
   get grandTotalCostUsd(): number {
     const tokenCost = this.summary?.totalCostUsd || 0;

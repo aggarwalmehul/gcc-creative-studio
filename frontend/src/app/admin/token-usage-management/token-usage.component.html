@@ -211,6 +211,12 @@
         <tr mat-header-row *matHeaderRowDef="detailDisplayedColumns"></tr>
         <tr mat-row *matRowDef="let row; columns: detailDisplayedColumns;"></tr>
       </table>
+      <mat-paginator
+        [pageSizeOptions]="[25, 50, 100]"
+        [pageSize]="25"
+        showFirstLastButtons
+        class="bg-neutral-950 text-white"
+      ></mat-paginator>
     </div>
 
     <div *ngIf="detailDataSource.data.length === 0" class="text-center py-8 text-neutral-400">
