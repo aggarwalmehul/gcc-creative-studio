@@ -14,7 +14,7 @@
  limitations under the License.
 -->
 
-<div #dashboardRoot class="p-6 text-white min-h-screen">
+<div class="p-6 text-white min-h-screen">
   <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
     <h1 class="text-2xl font-bold">Token Usage</h1>
 
@@ -58,6 +58,7 @@
   </div>
 
   <div *ngIf="!isLoading">
+    <div #dashboardRoot>
 
     <!-- Grand total summary card -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -195,6 +196,7 @@
       <div *ngIf="(billingUnits?.rows?.length || 0) === 0" class="text-center py-6 text-neutral-400">
         <p>No media generation usage recorded in this range.</p>
       </div>
+    </div>
     </div>
 
     <!-- ===== Detail view: raw rows ===== -->
