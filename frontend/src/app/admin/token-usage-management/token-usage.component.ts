@@ -21,6 +21,8 @@ import {MatSnackBar} from '@angular/material/snack-bar';
 import {forkJoin} from 'rxjs';
 import * as d3 from 'd3';
 import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import {
   TokenUsageService,
   TokenUsageRowV2,
@@ -43,6 +45,7 @@ function toIsoDate(d: Date): string {
 export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
   @ViewChild('dailyChartContainer') dailyChartContainer!: ElementRef;
   @ViewChild(MatPaginator) paginator!: MatPaginator;
+  @ViewChild('dashboardRoot') dashboardRoot!: ElementRef;
 
   isLoading = false;
 
@@ -286,5 +289,48 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
 
   private rangeLabel(): string {
     return `${toIsoDate(this.startDate)}_to_${toIsoDate(this.endDate)}`;
+  }
+
+  isExportingPdf = false;
+
+  async exportDashboardToPdf(): Promise<void> {
+    if (!this.dashboardRoot) return;
+    this.isExportingPdf = true;
+    this.cdr.detectChanges();
+
+    try {
+      const element = this.dashboardRoot.nativeElement as HTMLElement;
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#18181b',
+        scale: 2,
+        useCORS: true,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`token-usage-dashboard-${this.rangeLabel()}.pdf`);
+    } finally {
+      this.isExportingPdf = false;
+      this.cdr.detectChanges();
+    }
   }
 }

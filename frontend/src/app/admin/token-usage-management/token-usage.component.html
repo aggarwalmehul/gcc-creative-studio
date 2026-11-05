@@ -14,11 +14,19 @@
  limitations under the License.
 -->
 
-<div class="p-6 text-white min-h-screen">
+<div #dashboardRoot class="p-6 text-white min-h-screen">
   <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
     <h1 class="text-2xl font-bold">Token Usage</h1>
 
     <div class="flex items-end gap-3">
+      <studio-button
+        variant="primary"
+        size="small"
+        [disabled]="isExportingPdf"
+        (click)="exportDashboardToPdf()"
+      >
+        {{ isExportingPdf ? 'Generating PDF...' : 'Export Dashboard as PDF' }}
+      </studio-button>
       <mat-form-field appearance="fill" class="w-40">
         <mat-label>Start date</mat-label>
         <input
