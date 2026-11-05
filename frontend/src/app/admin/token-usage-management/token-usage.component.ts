@@ -90,9 +90,7 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
     this.loadAll();
   }
 
-  ngAfterViewInit(): void {
-    this.detailDataSource.paginator = this.paginator;
-  }
+  ngAfterViewInit(): void {}
 
   get grandTotalCostUsd(): number {
     const tokenCost = this.summary?.totalCostUsd || 0;
@@ -120,6 +118,7 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
         this.billingUnits = billingUnits;
         this.isLoading = false;
         this.cdr.detectChanges();
+        this.detailDataSource.paginator = this.paginator;
         this.renderDailyChart(summary.daily);
       },
       error: err => {
