@@ -14,12 +14,13 @@
  limitations under the License.
 -->
 
-<div class="p-6 text-white min-h-screen">
+<div #dashboardRoot class="p-6 text-white min-h-screen">
   <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
     <h1 class="text-2xl font-bold">Token Usage</h1>
 
     <div class="flex items-end gap-3">
       <studio-button
+        data-html2canvas-ignore="true"
         variant="primary"
         size="small"
         [disabled]="isExportingPdf"
@@ -58,7 +59,6 @@
   </div>
 
   <div *ngIf="!isLoading">
-    <div #dashboardRoot>
 
     <!-- Grand total summary card -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -158,7 +158,8 @@
 
     <!-- ===== Section 2: Media generation (Veo/Audio/Music) ===== -->
     <div class="flex justify-between items-center mb-3">
-      <h2 class="text-lg font-semibold text-neutral-200">Media Generation (Veo / Audio / Music)</h2>
+      <div class="h-6"></div>
+    <h2 class="text-lg font-semibold text-neutral-200">Media Generation (Veo / Audio / Music)</h2>
       <studio-button variant="primary" size="small" (click)="exportMediaGenerationToExcel()">
         Export to Excel
       </studio-button>
@@ -197,17 +198,16 @@
         <p>No media generation usage recorded in this range.</p>
       </div>
     </div>
-    </div>
 
     <!-- ===== Detail view: raw rows ===== -->
-    <div class="flex justify-between items-center mb-3">
+    <div data-html2canvas-ignore="true" class="flex justify-between items-center mb-3">
       <h2 class="text-lg font-semibold text-neutral-200">Detail</h2>
       <studio-button variant="primary" size="small" (click)="exportDetailToExcel()">
         Export to Excel
       </studio-button>
     </div>
 
-    <div *ngIf="detailDataSource.data.length > 0" class="overflow-hidden rounded-lg border border-neutral-800">
+    <div data-html2canvas-ignore="true" *ngIf="detailDataSource.data.length > 0" class="overflow-hidden rounded-lg border border-neutral-800">
       <table mat-table [dataSource]="detailDataSource" class="min-w-full divide-y divide-neutral-800 bg-neutral-950">
         <ng-container matColumnDef="timestamp">
           <th mat-header-cell *matHeaderCellDef class="px-6 py-3 text-left text-xs font-medium text-neutral-400 uppercase tracking-wider">Timestamp</th>
@@ -244,7 +244,7 @@
       ></mat-paginator>
     </div>
 
-    <div *ngIf="detailDataSource.data.length === 0" class="text-center py-8 text-neutral-400">
+    <div data-html2canvas-ignore="true" *ngIf="detailDataSource.data.length === 0" class="text-center py-8 text-neutral-400">
       <p>No token usage recorded in this range.</p>
     </div>
 

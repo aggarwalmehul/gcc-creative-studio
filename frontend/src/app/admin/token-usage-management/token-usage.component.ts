@@ -304,6 +304,7 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
         backgroundColor: '#18181b',
         scale: 2,
         useCORS: true,
+        ignoreElements: (el) => el.hasAttribute('data-html2canvas-ignore'),
       });
 
       const imgData = canvas.toDataURL('image/png');
