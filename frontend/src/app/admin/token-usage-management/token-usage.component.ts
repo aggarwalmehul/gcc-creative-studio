@@ -20,6 +20,7 @@ import {MatPaginator} from '@angular/material/paginator';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import {forkJoin} from 'rxjs';
 import * as d3 from 'd3';
+import * as XLSX from 'xlsx';
 import {
   TokenUsageService,
   TokenUsageRowV2,
@@ -260,5 +261,30 @@ export class TokenUsageManagementComponent implements OnInit, AfterViewInit {
       .call(d3.axisLeft(y).tickFormat(d => `$${d}`))
       .selectAll('text')
       .style('fill', '#9ca3af');
+  }
+
+  exportDetailToExcel(): void {
+    const ws = XLSX.utils.json_to_sheet(this.detailDataSource.data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Detail');
+    XLSX.writeFile(wb, `token-usage-detail-${this.rangeLabel()}.xlsx`);
+  }
+
+  exportTokenBreakdownToExcel(): void {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(this.summary?.byModel || []), 'By Model');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(this.summary?.byUser || []), 'By User');
+    XLSX.writeFile(wb, `token-usage-breakdown-${this.rangeLabel()}.xlsx`);
+  }
+
+  exportMediaGenerationToExcel(): void {
+    const ws = XLSX.utils.json_to_sheet(this.billingUnits?.rows || []);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Media Generation');
+    XLSX.writeFile(wb, `token-usage-media-generation-${this.rangeLabel()}.xlsx`);
+  }
+
+  private rangeLabel(): string {
+    return `${toIsoDate(this.startDate)}_to_${toIsoDate(this.endDate)}`;
   }
 }

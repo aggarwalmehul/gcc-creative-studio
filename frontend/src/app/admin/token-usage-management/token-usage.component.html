@@ -68,7 +68,12 @@
     </div>
 
     <!-- ===== Section 1: Token-based usage ===== -->
-    <h2 class="text-lg font-semibold mb-3 text-neutral-200">Token-Based Usage</h2>
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-lg font-semibold text-neutral-200">Token-Based Usage</h2>
+      <studio-button variant="primary" size="small" (click)="exportTokenBreakdownToExcel()">
+        Export to Excel
+      </studio-button>
+    </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
       <div class="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
@@ -143,7 +148,12 @@
     </div>
 
     <!-- ===== Section 2: Media generation (Veo/Audio/Music) ===== -->
-    <h2 class="text-lg font-semibold mb-3 text-neutral-200">Media Generation (Veo / Audio / Music)</h2>
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-lg font-semibold text-neutral-200">Media Generation (Veo / Audio / Music)</h2>
+      <studio-button variant="primary" size="small" (click)="exportMediaGenerationToExcel()">
+        Export to Excel
+      </studio-button>
+    </div>
 
     <div class="overflow-hidden rounded-lg border border-neutral-800 mb-8">
       <table mat-table [dataSource]="billingUnits?.rows || []" class="min-w-full divide-y divide-neutral-800 bg-neutral-950">
@@ -180,7 +190,12 @@
     </div>
 
     <!-- ===== Detail view: raw rows ===== -->
-    <h2 class="text-lg font-semibold mb-3 text-neutral-200">Detail</h2>
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-lg font-semibold text-neutral-200">Detail</h2>
+      <studio-button variant="primary" size="small" (click)="exportDetailToExcel()">
+        Export to Excel
+      </studio-button>
+    </div>
 
     <div *ngIf="detailDataSource.data.length > 0" class="overflow-hidden rounded-lg border border-neutral-800">
       <table mat-table [dataSource]="detailDataSource" class="min-w-full divide-y divide-neutral-800 bg-neutral-950">
