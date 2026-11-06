@@ -110,8 +110,15 @@ class CreateVeoDto(BaseDto):
     duration_seconds: int = Field(
         default=8,
         ge=1,
-        le=10,
-        description="Duration in seconds for the videos to generate (between 1 and 10 secs).",
+        le=15,
+        # GEMINI_OMNI_1_2_V1: raised from 10 to 15 so Omni 1.2 Flash's new
+        # native 15s clips aren't rejected here before the model-specific
+        # @model_validator below ever runs. This is intentionally the
+        # loosest, model-agnostic ceiling -- the actual per-model limits
+        # (8s for Veo, 10s for Omni/Omni 1.1, 15s for Omni 1.2) are still
+        # enforced correctly by validate_video_duration_and_resolution's
+        # max_duration logic, which runs after this field-level check.
+        description="Duration in seconds for the videos to generate (between 1 and 15 secs, subject to a lower per-model maximum).",
     )
     start_image_asset_id: AssetReferenceDto | None = Field(
         default=None,
