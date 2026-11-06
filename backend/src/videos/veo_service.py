@@ -1147,10 +1147,22 @@ def _process_video_in_background(
                             "status": JobStatusEnum.COMPLETED,
                             "prompt": rewritten_prompt,
                             "gcs_uris": final_gcs_uris,  # The final GCS URLs
-                            "thumbnail_uris": permanent_thumbnail_gcs_uris,
                             "generation_time": generation_time,
                             "num_media": len(final_gcs_uris),
                         }
+                        # FEATURE_PORT_CLOUD_TASKS_THUMBNAILS_V1: when thumbnails are
+                        # generated asynchronously via Cloud Tasks, this completion
+                        # write must NOT include "thumbnail_uris" -- permanent_thumbnail_gcs_uris
+                        # is just a list of "" placeholders in that mode, and this write
+                        # can race *after* the thumbnail worker's own update, silently
+                        # clobbering the real GCS URI it already persisted. The worker
+                        # (thumbnail_worker_controller.py) owns that field exclusively
+                        # in async mode.
+                        if not (
+                            config_service.THUMBNAILS_ASYNC_ENABLED
+                            and config_service.TASKS_WORKER_URL
+                        ):
+                            update_data["thumbnail_uris"] = permanent_thumbnail_gcs_uris
                         if raw_data_dict is not None:
                             update_data["raw_data"] = raw_data_dict
 
