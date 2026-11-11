@@ -36,9 +36,11 @@ import {provideHttpClient} from '@angular/common/http';
 import {provideHttpClientTesting} from '@angular/common/http/testing';
 import {provideRouter} from '@angular/router';
 import {CUSTOM_ELEMENTS_SCHEMA} from '@angular/core';
-import {of} from 'rxjs';
+import {of, Subject} from 'rxjs';
 
 import {VideoComponent} from './video.component';
+import {useTestBedAppInjector} from '../testing/app-injector.testing';
+import {NotificationService} from '../common/services/notification.service';
 import {SearchService} from '../services/search/search.service';
 import {WorkspaceStateService} from '../services/workspace/workspace-state.service';
 import {VideoStateService} from '../services/video-state.service';
@@ -105,6 +107,7 @@ describe('VideoComponent', () => {
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();
 
+    useTestBedAppInjector();
     fixture = TestBed.createComponent(VideoComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
