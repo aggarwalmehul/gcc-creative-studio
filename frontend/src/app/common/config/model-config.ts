@@ -283,6 +283,20 @@ export const MODEL_CONFIGS: GenerationModelConfig[] = [
       supportedDurations: [],
     },
   },
+  {
+    value: 'gemini-4-argon',
+    viewValue: 'Gemini 4 Argon',
+    type: 'TEXT',
+    icon: 'gemini-spark-icon',
+    isSvg: true,
+    capabilities: {
+      supportedModes: ['Multimodal to text'],
+      maxReferenceImages: 10,
+      supportedAspectRatios: [],
+      supportedResolutions: [],
+      supportedDurations: [],
+    },
+  },
   // --- Video Models ---
   {
     value: 'gemini-omni-1.1-flash-preview',
@@ -304,9 +318,12 @@ export const MODEL_CONFIGS: GenerationModelConfig[] = [
     },
   },
   {
-    // UPSTREAM_SYNC_9THSEP_V1: newer Omni sibling model.
-    value: 'gemini-omni-1.1-flash-preview',
-    viewValue: 'Gemini Omni 1.1 Flash (Preview)',
+    // GEMINI_OMNI_1_2_V1: newest Omni sibling, GA 5 Nov 2026 -- native 15s
+    // clips (up from 1.1's 10s), ~30% lower video-generation cost, stronger
+    // reference-adherence and multi-turn conversational editing per
+    // Google's announcement.
+    value: 'gemini-omni-1.2-flash',
+    viewValue: 'Gemini Omni 1.2 Flash',
     type: 'VIDEO',
     icon: 'layers',
     capabilities: {
@@ -318,9 +335,9 @@ export const MODEL_CONFIGS: GenerationModelConfig[] = [
       maxReferenceImages: 3,
       supportedAspectRatios: ['16:9', '9:16'],
       supportedResolutions: ['1K'],
-      supportedDurations: [4, 6, 8, 10],
+      supportedDurations: [4, 6, 8, 10, 15],
       supportsAudio: true,
-      supportsVideoExtension: true, // VIDEO_EXTENSION_CAPABILITY_FIX_V1
+      supportsVideoExtension: true,
     },
   },
   {
