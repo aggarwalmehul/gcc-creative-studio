@@ -21,6 +21,7 @@ from httpx import AsyncClient as RestClient
 
 from src.common.schema.genai_model_setup import GenAIModelSetup
 from src.common.token_logger import log_tokens
+from src.common.base_dto import normalize_retired_text_model
 from src.common.schema.media_item_model import AssetRoleEnum
 from src.config.config_service import config_service
 from src.workflows.schema.workflow_model import ReferenceMediaOrAsset
@@ -284,7 +285,7 @@ class WorkflowsExecutorService:
         # Note: The original code used a stream but returned the full text at the end.
         # Keeping this behavior for now.
         for chunk in self.genai_client.models.generate_content_stream(
-            model=request.config.model,
+            model=normalize_retired_text_model(request.config.model),
             contents=contents,
             config=generate_content_config,
         ):
@@ -296,7 +297,7 @@ class WorkflowsExecutorService:
         # last_chunk here rather than from each individual chunk.
         if last_chunk is not None:
             try:
-                log_tokens("creative-studio", request.config.model, last_chunk)
+                log_tokens("creative-studio", normalize_retired_text_model(request.config.model), last_chunk)
             except Exception as e:
                 logger.warning("Failed to log tokens for workflows generate_text: %s", e)
         return {"generated_text": text}

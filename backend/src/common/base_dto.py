@@ -45,6 +45,21 @@ class WildcardMimeTypeEnum(str, Enum):
     AUDIO_WILDCARD = "audio/*"
 
 
+# RETIRED_TEXT_MODELS_V1: ported from upstream 2098355a. Maps retired
+# Gemini 2.5 text model IDs to active Gemini 4 equivalents at call time,
+# so stored requests/workflows that still name a 2.5 model keep working.
+RETIRED_TEXT_MODEL_REPLACEMENTS: dict[str, str] = {
+    "gemini-2.5-pro": "gemini-4-argon",
+    "gemini-2.5-flash": "gemini-4-hydrogen",
+}
+
+
+def normalize_retired_text_model(model) -> str:
+    """Maps retired Gemini 2.5 text model IDs to active Gemini 4 equivalents."""
+    raw_value = model.value if isinstance(model, Enum) else str(model)
+    return RETIRED_TEXT_MODEL_REPLACEMENTS.get(raw_value, raw_value)
+
+
 class GenerationModelEnum(str, Enum):
     """Enum representing the available generation models."""
 
@@ -69,7 +84,8 @@ class GenerationModelEnum(str, Enum):
     GEMINI_3_1_PRO_PREVIEW = "gemini-3.1-pro-preview"
     GEMINI_3_1_FLASH_PREVIEW = "gemini-3.1-flash-preview"
     GEMINI_3_1_FLASH_LITE_PREVIEW = "gemini-3.1-flash-lite-preview"
-    GEMINI_4_ARGON = "gemini-4-argon"  # ARGON_CS_PILOT_V1 (2 Nov): Workflows Generate Text node only
+    GEMINI_4_ARGON = "gemini-4-argon"
+    GEMINI_4_HYDROGEN = "gemini-4-hydrogen"  # RETIRED_TEXT_MODELS_V1  # ARGON_CS_PILOT_V1 (2 Nov): Workflows Generate Text node only
 
     # Video-Specific Models
     GEMINI_OMNI = "gemini-omni-generate-preview"
