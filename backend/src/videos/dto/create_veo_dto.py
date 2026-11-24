@@ -205,6 +205,35 @@ class CreateVeoDto(BaseDto):
                 if item.role in reference_roles:
                     reference_roles_present = True
 
+        # REFERENCE_DEDUP_V1: ported from upstream. Drops exact-duplicate
+        # reference images across reference_images and source_media_items.
+        # Role is part of the key, so one image used as both ASSET and
+        # STYLE is kept twice. Video refs and count limits are not touched.
+        seen_image_keys: set[tuple] = set()
+        if self.reference_images is not None:
+            dedup_ref_images = []
+            for img in self.reference_images:
+                key = ("source_asset", img.asset_id, str(img.reference_type))
+                if key not in seen_image_keys:
+                    seen_image_keys.add(key)
+                    dedup_ref_images.append(img)
+            self.reference_images = dedup_ref_images or None
+
+        if self.source_media_items is not None:
+            dedup_media_items = []
+            for item in self.source_media_items:
+                if item.role in {
+                    AssetRoleEnum.IMAGE_REFERENCE_ASSET,
+                    AssetRoleEnum.IMAGE_REFERENCE_STYLE,
+                }:
+                    key = ("media_item", item.media_item_id,
+                           item.media_index or 0, str(item.role))
+                    if key in seen_image_keys:
+                        continue
+                    seen_image_keys.add(key)
+                dedup_media_items.append(item)
+            self.source_media_items = dedup_media_items or None
+
         has_asset_references = (
             bool(self.reference_images)
             or bool(self.reference_video)
