@@ -213,18 +213,10 @@ class CreateVeoDto(BaseDto):
         has_any_references = has_asset_references or reference_roles_present
 
         if has_any_references:
-            supported_reference_models = {
-                GenerationModelEnum.VEO_3_1_PREVIEW,
-                GenerationModelEnum.VEO_3_1_GENERATE_001,
-                GenerationModelEnum.VEO_3_1_LITE_GENERATE_001,
-                GenerationModelEnum.VEO_3_1_LITE_PREVIEW,
-                GenerationModelEnum.VEO_3_1_FAST_GENERATE_001,
-                GenerationModelEnum.GEMINI_OMNI,
-                GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
-                GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,
-                GenerationModelEnum.GEMINI_OMNI_1_2_FLASH,
-            }
-            if model not in supported_reference_models:
+            # MODEL_CAPABILITY_PROPERTIES_V1: was a 9-member hardcoded set,
+            # duplicated across 7+ locations in this file + veo_service.py;
+            # now centralized in GenerationModelEnum.max_reference_images.
+            if model.max_reference_images == 0:
                 raise ValueError(
                     "Reference images/media are only supported by the "
                     f"'{GenerationModelEnum.VEO_3_1_PREVIEW.value}' model, "
@@ -253,12 +245,7 @@ class CreateVeoDto(BaseDto):
                 )
 
         # Validate model-specific resolution limits
-        if model in (
-            GenerationModelEnum.GEMINI_OMNI,
-            GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
-            GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,
-            GenerationModelEnum.GEMINI_OMNI_1_2_FLASH,
-        ):
+        if model.is_gemini_omni_model:  # MODEL_CAPABILITY_PROPERTIES_V1
             allowed_resolutions = {"1K"}
         elif model in (
             GenerationModelEnum.VEO_3_1_LITE_GENERATE_001,
@@ -275,17 +262,9 @@ class CreateVeoDto(BaseDto):
             )
 
         # Validate model-specific duration limits
-        max_duration = 8
-        if model in (
-            GenerationModelEnum.GEMINI_OMNI,
-            GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
-            GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,
-        ):
-            max_duration = 10
-        elif model == GenerationModelEnum.GEMINI_OMNI_1_2_FLASH:
-            # GEMINI_OMNI_1_2_V1: 1.2 Flash supports native 15s clips (up
-            # from 1.1's 10s cap), per Google's 5 Nov 2026 GA announcement.
-            max_duration = 15
+        # MODEL_CAPABILITY_PROPERTIES_V1: centralized in
+        # GenerationModelEnum.max_video_duration (base_dto.py).
+        max_duration = model.max_video_duration
 
         if self.duration_seconds > max_duration:
             raise ValueError(

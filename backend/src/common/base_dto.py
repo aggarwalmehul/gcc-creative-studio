@@ -135,6 +135,57 @@ class GenerationModelEnum(str, Enum):
         ]
 
     @property
+    def is_gemini_omni_model(self) -> bool:
+        """Returns True if the model is a Gemini Omni video model.
+
+        MODEL_CAPABILITY_PROPERTIES_V1: centralizes a check that was
+        previously duplicated as a hardcoded tuple at 7+ call sites across
+        create_veo_dto.py and veo_service.py -- see max_reference_images
+        and max_video_duration below for the same pattern applied to
+        reference-support and duration limits.
+        """
+        return self in (
+            GenerationModelEnum.GEMINI_OMNI,
+            GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
+            GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,
+            GenerationModelEnum.GEMINI_OMNI_1_2_FLASH,
+        )
+
+    @property
+    def max_reference_images(self) -> int:
+        """Returns the maximum number of reference images supported for
+        video generation, or 0 if the model doesn't support references.
+        MODEL_CAPABILITY_PROPERTIES_V1.
+        """
+        if self.is_gemini_omni_model or self in (
+            GenerationModelEnum.VEO_3_1_PREVIEW,
+            GenerationModelEnum.VEO_3_1_GENERATE_001,
+            GenerationModelEnum.VEO_3_1_LITE_GENERATE_001,
+            GenerationModelEnum.VEO_3_1_LITE_PREVIEW,
+            GenerationModelEnum.VEO_3_1_FAST_GENERATE_001,
+        ):
+            return 3
+        return 0
+
+    @property
+    def max_video_duration(self) -> int:
+        """Returns the maximum supported clip duration in seconds for this
+        model. MODEL_CAPABILITY_PROPERTIES_V1: this is today's flat
+        per-model limit, matching existing behavior exactly; it does not
+        yet vary by whether frames/references/extension are present
+        (a separate, deliberately deferred refinement).
+        """
+        if self in (
+            GenerationModelEnum.GEMINI_OMNI,
+            GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
+            GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,
+        ):
+            return 10
+        if self == GenerationModelEnum.GEMINI_OMNI_1_2_FLASH:
+            return 15
+        return 8
+
+    @property
     def valid_aspect_ratios(self) -> list["AspectRatioEnum"]:
         """Returns the valid aspect ratios for the model."""
         if self in [
