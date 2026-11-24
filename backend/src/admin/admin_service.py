@@ -168,6 +168,7 @@ class AdminService:
                     row["model"] or "unknown",
                     float(row["tokens_in"] or 0),
                     float(row["tokens_out"] or 0),
+                    at=row["timestamp"],
                 ),
             )
             for row in rows
@@ -212,7 +213,7 @@ class AdminService:
                 float(row["tokens_out"] or 0),
                 int(row["total"] or 0),
             )
-            row_cost = cost_usd(pricing, model, tin, tout)
+            row_cost = cost_usd(pricing, model, tin, tout, at=row["day"])
 
             d = daily.setdefault(day, {"tokens": 0, "cost_usd": 0.0})
             d["tokens"] += total

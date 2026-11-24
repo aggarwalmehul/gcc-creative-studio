@@ -44,12 +44,31 @@ def load_pricing() -> dict:
     return _cached_pricing
 
 
-def cost_usd(pricing: dict, model: str, tokens_in: float, tokens_out: float) -> float:
-    """Token-based cost, in USD. Unlisted models use the 'default' rate."""
+def _rate_on(entry: dict, at) -> dict:
+    """DATE_AWARE_PRICING_V1: returns the input/output rate in effect on
+    `at` (a date/datetime or ISO string). The entry's flat input/output keys
+    are the base rate; an optional "rates" list of {"from": "YYYY-MM-DD",
+    "input": x, "output": y} overrides it from each date onward. Flat keys
+    are kept so genai-token-report (which only reads them) still works.
+    """
+    rate = {"input": entry["input"], "output": entry["output"]}
+    if at is None or not entry.get("rates"):
+        return rate
+    day = str(at)[:10]
+    for r in sorted(entry["rates"], key=lambda r: r["from"]):
+        if r["from"] <= day:
+            rate = {"input": r["input"], "output": r["output"]}
+    return rate
+
+
+def cost_usd(pricing: dict, model: str, tokens_in: float, tokens_out: float, at=None) -> float:
+    """Token-based cost, in USD, at the rate in effect on `at` (defaults to
+    the base rate). Unlisted models use the 'default' rate."""
     m = pricing.get("models", {}).get(
         model, pricing.get("default", {"input": 0.5, "output": 1.5})
     )
-    return (tokens_in / 1_000_000) * m["input"] + (tokens_out / 1_000_000) * m["output"]
+    r = _rate_on(m, at)
+    return (tokens_in / 1_000_000) * r["input"] + (tokens_out / 1_000_000) * r["output"]
 
 
 def cost_units_usd(pricing: dict, model: str, unit_type: str, quantity: float) -> float:
