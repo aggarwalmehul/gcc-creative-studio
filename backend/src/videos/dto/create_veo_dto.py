@@ -153,6 +153,11 @@ class CreateVeoDto(BaseDto):
         default=None,
         description="Object containing ID and type of asset to use as a reference video.",
     )
+    folder_id: int | None = Field(
+        default=None,
+        ge=1,
+        description="Optional gallery folder (same workspace) to save the generated video into. OUTPUT_FOLDER_V1.",
+    )
     reference_audio: AssetReferenceDto | None = Field(
         default=None,
         description="Object containing ID and type of asset to use as a reference audio.",
