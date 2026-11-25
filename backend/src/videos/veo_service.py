@@ -1175,10 +1175,13 @@ def _process_video_in_background(
                         # clobbering the real GCS URI it already persisted. The worker
                         # (thumbnail_worker_controller.py) owns that field exclusively
                         # in async mode.
-                        if not (
-                            config_service.THUMBNAILS_ASYNC_ENABLED
-                            and config_service.TASKS_WORKER_URL
-                        ):
+                        # THUMB_WRITE_ONLY_REAL_V1: the async-mode guard above also
+                        # dropped Veo's *synchronously generated* thumbnails (Veo never
+                        # enqueues a task), leaving thumbnail_uris = {} on every Veo job
+                        # since 6 Nov. Write only when there is at least one real URI:
+                        # Omni async -> all "" placeholders -> omitted (worker owns it);
+                        # Veo sync   -> real gs:// URIs     -> written.
+                        if any(permanent_thumbnail_gcs_uris):
                             update_data["thumbnail_uris"] = permanent_thumbnail_gcs_uris
                         if raw_data_dict is not None:
                             update_data["raw_data"] = raw_data_dict
