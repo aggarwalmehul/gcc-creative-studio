@@ -70,6 +70,22 @@ def _classify_generation_error(raw_error) -> tuple[str, str]:
             "capacity_throttled",
             "The service is temporarily busy. Please try again in a moment.",
         )
+    # OMNI_400_MESSAGE_PASSTHROUGH_V1: a 400 invalid_request means the request
+    # itself was rejected -- retrying won't help, so surface the model's own
+    # reason instead of a generic "try again".
+    if "invalid_request" in s or "Error code: 400" in s:
+        import re
+        m = re.search(r"'message':\s*'([^']{1,300})'", s)
+        if m:
+            return (
+                "invalid_request",
+                f"The model rejected this request: {m.group(1)}",
+            )
+        return (
+            "invalid_request",
+            "The model rejected this request's settings. Adjust the inputs "
+            "(e.g. duration or references) and try again.",
+        )
     return ("generation_error", "Video generation failed. Please try again.")
 from src.common.schema.media_item_model import (
     AssetRoleEnum,
