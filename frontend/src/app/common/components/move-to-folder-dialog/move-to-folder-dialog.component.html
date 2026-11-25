@@ -21,9 +21,9 @@
         <mat-icon>drive_file_move</mat-icon>
       </div>
       <div>
-        <h2 class="dialog-title">Move Items</h2>
+        <h2 class="dialog-title">{{ data.mode === 'select' ? 'Output folder' : 'Move Items' }}</h2>
         <p class="dialog-subtitle">
-          Select destination folder for {{ data.itemCount }} item{{ data.itemCount === 1 ? '' : 's' }}
+          {{ data.mode === 'select' ? 'New media is saved to the folder you pick' : 'Select destination folder for ' + data.itemCount + ' item' + (data.itemCount === 1 ? '' : 's') }}
         </p>
       </div>
     </div>
@@ -85,6 +85,7 @@
             }
           </div>
         </mat-tab>
+        @if (data.mode !== 'select') {
         <mat-tab label="Workspace">
           <div class="folder-list custom-scrollbar">
             @for (opt of filteredWorkspaces; track opt.id) {
@@ -121,6 +122,7 @@
             }
           </div>
         </mat-tab>
+        }
       </mat-tab-group>
     }
   </div>
@@ -135,7 +137,7 @@
       [disabled]="isLoading || (selectedDestinationId === null && data.currentFolderId === null) || selectedDestinationId === undefined"
       (click)="confirm()"
     >
-      Move Here
+      {{ data.mode === 'select' ? 'Select' : 'Move Here' }}
     </studio-button>
   </div>
 </div>

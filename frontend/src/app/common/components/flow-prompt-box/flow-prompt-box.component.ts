@@ -158,6 +158,18 @@ export class FlowPromptBoxComponent implements OnInit, OnDestroy {
   @Input() referenceImages: ReferenceImage[] = [];
   @Input() referenceImagesType: 'ASSET' | 'STYLE' = 'ASSET';
   @Input() referenceVideo: any | null = null;
+  // MULTI_VIDEO_UI_V1: full list (its first item is also passed as referenceVideo)
+  @Input() referenceVideos: any[] = [];
+  @Input() maxReferenceVideos = 1;
+  @Output() removeReferenceVideoAt = new EventEmitter<{
+    index: number;
+    event: Event;
+  }>();
+  // OUTPUT_FOLDER_UI_V1
+  @Input() showFolderChip = false;
+  @Input() outputFolderName: string | null = null;
+  @Output() openFolderSelector = new EventEmitter<void>();
+  @Output() clearOutputFolder = new EventEmitter<void>();
   @Input() referenceAudio: any | null = null;
   private _externalUrl: string | null = null;
   private externalUrlSignal = signal<string | null>(null);
@@ -389,6 +401,15 @@ export class FlowPromptBoxComponent implements OnInit, OnDestroy {
   getSelectedModelObject(): GenerationModelConfig | undefined {
     return this.generationModelsSignal().find(
       m => m.viewValue === this.selectedGenerationModelSignal(),
+    );
+  }
+
+  isImagePreview(rv: any): boolean {
+    const u: string = rv?.previewUrl || '';
+    return (
+      rv?.type === 'media_item' ||
+      ['.png', '.webp', '.jpg', '.jpeg'].some(x => u.includes(x)) ||
+      u.includes('presignedThumbnailUrls')
     );
   }
 

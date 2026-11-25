@@ -79,6 +79,25 @@
         >
           x{{ outputs }}
         </button>
+        <!-- OUTPUT_FOLDER_UI_V1: output folder chip -->
+        @if (showFolderChip) {
+          <button
+            type="button"
+            (click)="openFolderSelector.emit(); $event.stopPropagation()"
+            class="inline-flex max-w-[140px] items-center gap-1 rounded-md bg-neutral-800 px-2 py-1 cursor-pointer hover:bg-neutral-700"
+            [matTooltip]="outputFolderName ? 'Saving to: ' + outputFolderName : 'Choose output folder'"
+          >
+            <mat-icon class="!h-4 !w-4 !text-base">folder</mat-icon>
+            <span class="truncate">{{ outputFolderName || 'Folder' }}</span>
+            @if (outputFolderName) {
+              <mat-icon
+                class="!h-4 !w-4 !text-base"
+                (click)="$event.stopPropagation(); clearOutputFolder.emit()"
+                >close</mat-icon
+              >
+            }
+          </button>
+        }
         <!-- Duration -->
         @if (hasDurationOptions()) {
           <button
@@ -299,6 +318,49 @@
               </button>
             </ng-container>
           </div>
+
+          <!-- MULTI_VIDEO_UI_V1: extra reference videos (Omni 1.1/1.2 allow up to 3) -->
+          @if (mode === 'Ingredients to Video' && isOmniModel()) {
+            @for (rv of referenceVideos.slice(1); track $index) {
+              <div
+                class="relative h-20 w-20 rounded-xl border-2 border-dashed border-neutral-700 bg-neutral-800 flex items-center justify-center"
+              >
+                @if (isImagePreview(rv)) {
+                  <img
+                    [src]="rv.previewUrl"
+                    class="h-full w-full rounded-lg object-cover"
+                  />
+                } @else {
+                  <video
+                    [src]="rv.previewUrl"
+                    class="h-full w-full rounded-lg object-cover"
+                    muted
+                  ></video>
+                }
+                <button
+                  type="button"
+                  (click)="
+                    $event.stopPropagation();
+                    removeReferenceVideoAt.emit({index: $index + 1, event: $event})
+                  "
+                  class="absolute -right-2 -top-2 rounded-full bg-neutral-900 p-0.5 text-neutral-400 hover:text-white"
+                >
+                  <mat-icon class="!h-4 !w-4 text-sm">close</mat-icon>
+                </button>
+              </div>
+            }
+            @if (referenceVideo && referenceVideos.length < maxReferenceVideos) {
+              <div
+                class="relative h-20 w-20 cursor-pointer rounded-xl border-2 border-dashed border-neutral-700 bg-neutral-800 transition-colors hover:border-neutral-500 hover:bg-neutral-700 flex flex-col items-center justify-center"
+                (click)="openVideoSelectorForReference.emit()"
+              >
+                <mat-icon class="text-neutral-500">videocam</mat-icon>
+                <span class="absolute bottom-1 text-[8px] text-neutral-500"
+                  >+ Video Ref</span
+                >
+              </div>
+            }
+          }
 
           <!-- Audio Reference Slot (only for Ingredients to Video mode AND only for Gemini Omni) -->
           <div

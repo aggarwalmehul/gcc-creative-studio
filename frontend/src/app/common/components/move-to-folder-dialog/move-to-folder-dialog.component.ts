@@ -28,6 +28,9 @@ export interface MoveToFolderDialogData {
   itemCount: number;
   movingFolderIds?: number[];
   currentFolderId?: number | null;
+  // OUTPUT_FOLDER_UI_V1: 'select' = just pick a folder (no move wording, no
+  // Workspace tab). Default 'move' keeps the existing behaviour.
+  mode?: 'move' | 'select';
 }
 
 export interface FlattenedFolderOption {

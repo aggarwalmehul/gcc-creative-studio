@@ -74,6 +74,12 @@ import {
 } from '../utils/handleMessageSnackbar';
 import {NumPos} from '../common/components/flow-prompt-box/flow-prompt-box.component';
 
+// MULTI_VIDEO_UI_V1 / OUTPUT_FOLDER_UI_V1
+import {
+  MoveToFolderDialogComponent,
+  MoveToFolderDialogResult,
+} from '../common/components/move-to-folder-dialog/move-to-folder-dialog.component';
+
 @Component({
   selector: 'app-video',
   templateUrl: './video.component.html',
@@ -111,7 +117,18 @@ export class VideoComponent implements OnInit, AfterViewInit {
   isExtensionMode = false;
   referenceImages: ReferenceImage[] = [];
   referenceImagesType: 'ASSET' | 'STYLE' = 'ASSET';
-  referenceVideo: ReferenceVideo | null = null;
+  // MULTI_VIDEO_UI_V1: the list is the source of truth. `referenceVideo` stays
+  // as a first-item accessor so single-video paths (remix, Edit with Omni,
+  // restore) keep working; assigning to it replaces the whole list.
+  referenceVideos: ReferenceVideo[] = [];
+  get referenceVideo(): ReferenceVideo | null {
+    return this.referenceVideos[0] ?? null;
+  }
+  set referenceVideo(v: ReferenceVideo | null) {
+    this.referenceVideos = v ? [v] : [];
+  }
+  // OUTPUT_FOLDER_UI_V1: chosen output folder (ignored if workspace changed)
+  outputFolder: {id: number; name: string; workspaceId: number} | null = null;
   referenceAudio: ReferenceAudio | null = null;
   parentMediaItemId: number | null = null;
   currentMode = 'Text to Video';
@@ -298,6 +315,7 @@ export class VideoComponent implements OnInit, AfterViewInit {
       referenceImages: this.referenceImages,
       referenceImagesType: this.referenceImagesType,
       referenceVideo: this.referenceVideo,
+      referenceVideos: this.referenceVideos,
       referenceAudio: this.referenceAudio,
     });
   }
@@ -326,7 +344,11 @@ export class VideoComponent implements OnInit, AfterViewInit {
     this.currentMode = state.mode || 'Text to Video';
     this.referenceImages = state.referenceImages || [];
     this.referenceImagesType = state.referenceImagesType || 'ASSET';
-    this.referenceVideo = state.referenceVideo || null;
+    this.referenceVideos = state.referenceVideos?.length
+      ? [...state.referenceVideos]
+      : state.referenceVideo
+        ? [state.referenceVideo]
+        : [];
     this.referenceAudio = state.referenceAudio || null;
 
     this.negativePhrases = state.negativePrompt
@@ -747,6 +769,17 @@ export class VideoComponent implements OnInit, AfterViewInit {
       }
     }
 
+    // MULTI_VIDEO_UI_V1 / OUTPUT_FOLDER_UI_V1
+    const videosForRequest = this.referenceVideos.slice(
+      0,
+      this.maxReferenceVideos,
+    );
+    const activeWsForFolder = this.workspaceStateService.getActiveWorkspaceId();
+    const folderIdForRequest =
+      this.outputFolder && this.outputFolder.workspaceId === activeWsForFolder
+        ? this.outputFolder.id
+        : null;
+
     const payload: VeoRequest = {
       ...this.searchRequest,
       startImageAssetId:
@@ -777,13 +810,25 @@ export class VideoComponent implements OnInit, AfterViewInit {
               this.currentMode === 'Extend Video'
             ? validSourceMediaItems
             : undefined,
+      // One video keeps using the legacy single field (already tested);
+      // two or more go through referenceVideos.
       referenceVideo:
-        this.currentMode === 'Ingredients to Video' && this.referenceVideo
+        this.currentMode === 'Ingredients to Video' &&
+        videosForRequest.length === 1
           ? {
-              id: this.referenceVideo.id,
-              type: this.referenceVideo.type,
-              index: this.referenceVideo.index,
+              id: videosForRequest[0].id,
+              type: videosForRequest[0].type,
+              index: videosForRequest[0].index,
             }
+          : undefined,
+      referenceVideos:
+        this.currentMode === 'Ingredients to Video' &&
+        videosForRequest.length > 1
+          ? videosForRequest.map(v => ({
+              id: v.id,
+              type: v.type,
+              index: v.index,
+            }))
           : undefined,
       referenceAudio:
         this.currentMode === 'Ingredients to Video' && this.referenceAudio
@@ -794,6 +839,7 @@ export class VideoComponent implements OnInit, AfterViewInit {
             }
           : undefined,
       parentMediaItemId: this.parentMediaItemId ?? undefined,
+      folderId: folderIdForRequest ?? undefined,
     };
 
     // TODO: Add notification when video is completed after the pooling
@@ -1549,13 +1595,18 @@ export class VideoComponent implements OnInit, AfterViewInit {
   }
 
   openVideoSelectorForReference(): void {
+    // MULTI_VIDEO_UI_V1: allow several videos in one go, up to the cap.
+    const remainingVideoSlots =
+      this.maxReferenceVideos - this.referenceVideos.length;
+    if (remainingVideoSlots <= 0) return;
     const dialogRef = this.dialog.open(ImageSelectorComponent, {
       width: '90vw',
       height: '80vh',
       maxWidth: '90vw',
       data: {
         mimeType: 'video/*',
-        multiSelect: false,
+        multiSelect: remainingVideoSlots > 1,
+        maxSelection: remainingVideoSlots,
       },
       panelClass: 'image-selector-dialog',
     });
@@ -1563,28 +1614,38 @@ export class VideoComponent implements OnInit, AfterViewInit {
     dialogRef.afterClosed().subscribe((result: any) => {
       if (!result) return;
 
-      const res = Array.isArray(result) ? result[0] : result;
-      if ('gcsUri' in res) {
-        this.referenceVideo = {
-          id: res.id,
-          type: 'source_asset',
-          previewUrl: res.presignedThumbnailUrl || res.presignedUrl || '',
-          index: 0,
-        };
-      } else {
-        const thumbnail =
-          res.mediaItem.presignedThumbnailUrls?.[res.selectedIndex];
-        const previewUrl =
-          thumbnail || res.mediaItem.presignedUrls?.[res.selectedIndex];
-        if (previewUrl) {
-          this.referenceVideo = {
-            id: res.mediaItem.id,
-            type: 'media_item',
-            previewUrl: previewUrl,
-            index: res.selectedIndex,
-          };
+      const picked: any[] = Array.isArray(result) ? result : [result];
+      const next: ReferenceVideo[] = [...this.referenceVideos];
+      const add = (v: ReferenceVideo) => {
+        const dup = next.some(
+          x => x.id === v.id && x.type === v.type && x.index === v.index,
+        );
+        if (!dup && next.length < this.maxReferenceVideos) next.push(v);
+      };
+      for (const res of picked) {
+        if ('gcsUri' in res) {
+          add({
+            id: res.id,
+            type: 'source_asset',
+            previewUrl: res.presignedThumbnailUrl || res.presignedUrl || '',
+            index: 0,
+          });
+        } else {
+          const thumbnail =
+            res.mediaItem.presignedThumbnailUrls?.[res.selectedIndex];
+          const previewUrl =
+            thumbnail || res.mediaItem.presignedUrls?.[res.selectedIndex];
+          if (previewUrl) {
+            add({
+              id: res.mediaItem.id,
+              type: 'media_item',
+              previewUrl: previewUrl,
+              index: res.selectedIndex,
+            });
+          }
         }
       }
+      this.referenceVideos = next;
       this.handleOmniModelSwitch();
       this.clampDurationForReferenceVideo();
       this.saveState();
@@ -1593,7 +1654,8 @@ export class VideoComponent implements OnInit, AfterViewInit {
 
   clearReferenceVideo(event: Event): void {
     event.stopPropagation();
-    this.referenceVideo = null;
+    // MULTI_VIDEO_UI_V1: the first tile's x removes just that video
+    this.referenceVideos = this.referenceVideos.slice(1);
     this.saveState();
   }
 
@@ -1660,6 +1722,60 @@ export class VideoComponent implements OnInit, AfterViewInit {
         'With a reference video, Gemini Omni supports up to 10 seconds, so the duration was set to 10s.',
       );
     }
+  }
+
+  // MULTI_VIDEO_UI_V1: Omni 1.1/1.2 accept up to 3 reference videos (backend
+  // enforces the same); every other model keeps the single-video limit.
+  get maxReferenceVideos(): number {
+    const m = this.searchRequest.generationModel;
+    return m === 'gemini-omni-1.1-flash-preview' ||
+      m === 'gemini-omni-1.2-flash'
+      ? 3
+      : 1;
+  }
+
+  removeReferenceVideoAt(e: {index: number; event: Event}): void {
+    e.event.stopPropagation();
+    this.referenceVideos = this.referenceVideos.filter(
+      (_, i) => i !== e.index,
+    );
+    this.saveState();
+  }
+
+  // OUTPUT_FOLDER_UI_V1
+  openFolderSelector(): void {
+    const workspaceId = this.workspaceStateService.getActiveWorkspaceId();
+    if (workspaceId === null || workspaceId === undefined) {
+      this._snackBar.open('Select a workspace first.', 'OK', {duration: 4000});
+      return;
+    }
+    const dialogRef = this.dialog.open(MoveToFolderDialogComponent, {
+      width: '560px',
+      maxWidth: '95vw',
+      data: {
+        mode: 'select',
+        workspaceId,
+        itemCount: 0,
+        currentFolderId: this.outputFolder?.id ?? undefined,
+      },
+    });
+    dialogRef
+      .afterClosed()
+      .subscribe((res: MoveToFolderDialogResult | undefined) => {
+        if (!res || res.destinationFolderId === undefined) return;
+        this.outputFolder =
+          res.destinationFolderId === null
+            ? null
+            : {
+                id: res.destinationFolderId,
+                name: res.destinationName,
+                workspaceId,
+              };
+      });
+  }
+
+  clearOutputFolder(): void {
+    this.outputFolder = null;
   }
 
   private handleOmniModelSwitch(): void {

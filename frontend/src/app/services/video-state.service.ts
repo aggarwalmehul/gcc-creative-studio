@@ -45,6 +45,7 @@ interface VideoState {
   referenceImages: ReferenceImage[];
   referenceImagesType: 'ASSET' | 'STYLE';
   referenceVideo: ReferenceVideo | null;
+  referenceVideos?: ReferenceVideo[]; // MULTI_VIDEO_UI_V1
   referenceAudio: ReferenceAudio | null;
 }
 
@@ -130,6 +131,7 @@ export class VideoStateService {
         // Don't save reference files to localStorage
         const partialState: Partial<VideoState> = {...updated};
         delete partialState.referenceVideo;
+        delete partialState.referenceVideos;
         delete partialState.referenceAudio;
         delete partialState.referenceImages;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(partialState));
