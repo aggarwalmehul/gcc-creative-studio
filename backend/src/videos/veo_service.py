@@ -1511,6 +1511,49 @@ class VeoService:
             The initial MediaItem with a 'processing' status and a pre-generated ID.
 
         """
+        # REF_VALIDATION_V1: resolve every referenced input up front and reject
+        # with 400 if any is missing, soft-deleted, or not accessible. Before
+        # this, the worker silently dropped unresolvable references (start/end
+        # frames, source video, reference images/videos/audio) and generated
+        # with fewer inputs than the user picked.
+        async def _check_ref(ref_type: str, ref_id: int, label: str, need_media: bool = True) -> None:
+            if ref_type == "media_item":
+                found = await owned_media_item(
+                    self.media_repo, ref_id, request_dto.workspace_id
+                )
+                ok = bool(found) and (bool(found.gcs_uris) or not need_media)
+            else:
+                found = await owned_source_asset(self.source_asset_repo, ref_id, user)
+                ok = found is not None
+            if not ok:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"{label} ({ref_type} {ref_id}) was not found, has been "
+                        "deleted, or is not accessible."
+                    ),
+                )
+
+        for _ref, _label in (
+            (request_dto.start_image_asset_id, "Start frame"),
+            (request_dto.end_image_asset_id, "End frame"),
+            (request_dto.source_video_asset_id, "Source video"),
+            (request_dto.reference_audio, "Reference audio"),
+        ):
+            if _ref:
+                await _check_ref(_ref.type, _ref.id, _label)
+        for _ref in request_dto.all_reference_videos():
+            await _check_ref(_ref.type, _ref.id, "Reference video")
+        for _ref_img in request_dto.reference_images or []:
+            await _check_ref("source_asset", _ref_img.asset_id, "Reference image")
+        for _link in request_dto.source_media_items or []:
+            await _check_ref("media_item", _link.media_item_id, "Referenced media item")
+        if request_dto.parent_media_item_id:
+            await _check_ref(
+                "media_item", request_dto.parent_media_item_id,
+                "Parent media item", need_media=False,
+            )
+
         # 1. Prepare source asset links if they exist
         source_assets: list[SourceAssetLink] = []
         source_media_items: list[SourceMediaItemLink] = []
