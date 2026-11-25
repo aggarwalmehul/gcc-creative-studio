@@ -714,6 +714,7 @@ export class VideoComponent implements OnInit, AfterViewInit {
       }
     }
 
+    this.clampDurationForReferenceVideo();
     this.isLoading = true;
     this.videoDocuments = null;
 
@@ -1480,11 +1481,19 @@ export class VideoComponent implements OnInit, AfterViewInit {
     this.currentMode = 'Ingredients to Video';
     this.selectedMode.set('Ingredients to Video');
 
-    const omniModel = this.generationModels.find(
-      m => m.value === 'gemini-omni-1.1-flash-preview',
-    );
-    if (omniModel) {
-      this.selectModel(omniModel);
+    // GEMINI_OMNI_1_2_FE_V1: keep 1.1/1.2 if already selected; only fall back
+    // to 1.1 when the current model isn't Omni.
+    const alreadyOmni = [
+      'gemini-omni-1.1-flash-preview',
+      'gemini-omni-1.2-flash',
+    ].includes(this.searchRequest.generationModel);
+    if (!alreadyOmni) {
+      const omniModel = this.generationModels.find(
+        m => m.value === 'gemini-omni-1.1-flash-preview',
+      );
+      if (omniModel) {
+        this.selectModel(omniModel);
+      }
     }
 
     this.referenceVideo = {
@@ -1577,6 +1586,7 @@ export class VideoComponent implements OnInit, AfterViewInit {
         }
       }
       this.handleOmniModelSwitch();
+      this.clampDurationForReferenceVideo();
       this.saveState();
     });
   }
@@ -1629,12 +1639,36 @@ export class VideoComponent implements OnInit, AfterViewInit {
     this.saveState();
   }
 
+  // OMNI_REF_VIDEO_DURATION_CAP_V1: with a reference video the Interactions API
+  // caps Omni output at 10s; the backend returns 422 above that.
+  private clampDurationForReferenceVideo(): void {
+    const model = this.searchRequest.generationModel;
+    const isOmni =
+      model === 'gemini-omni-flash-preview' ||
+      model === 'gemini-omni-1.1-flash-preview' ||
+      model === 'gemini-omni-1.2-flash';
+    if (
+      isOmni &&
+      this.currentMode === 'Ingredients to Video' &&
+      this.referenceVideo &&
+      (this.searchRequest.durationSeconds ?? 0) > 10
+    ) {
+      this.searchRequest.durationSeconds = 10;
+      this.saveState();
+      handleSuccessSnackbar(
+        this._snackBar,
+        'With a reference video, Gemini Omni supports up to 10 seconds, so the duration was set to 10s.',
+      );
+    }
+  }
+
   private handleOmniModelSwitch(): void {
     if (this.referenceVideo || this.referenceAudio) {
       const currentModel = this.searchRequest.generationModel;
       if (
         currentModel === 'gemini-omni-flash-preview' ||
-        currentModel === 'gemini-omni-1.1-flash-preview'
+        currentModel === 'gemini-omni-1.1-flash-preview' ||
+        currentModel === 'gemini-omni-1.2-flash' // GEMINI_OMNI_1_2_FE_V1
       ) {
         return;
       }
@@ -1766,7 +1800,8 @@ export class VideoComponent implements OnInit, AfterViewInit {
       const currentModel = this.searchRequest.generationModel;
       if (
         currentModel === 'gemini-omni-flash-preview' ||
-        currentModel === 'gemini-omni-1.1-flash-preview'
+        currentModel === 'gemini-omni-1.1-flash-preview' ||
+        currentModel === 'gemini-omni-1.2-flash' // GEMINI_OMNI_1_2_FE_V1
       ) {
         // Already on an Omni model
       } else {

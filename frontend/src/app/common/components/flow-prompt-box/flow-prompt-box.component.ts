@@ -398,6 +398,7 @@ export class FlowPromptBoxComponent implements OnInit, OnDestroy {
     return (
       val === 'gemini-omni-flash-preview' ||
       val === 'gemini-omni-1.1-flash-preview' ||
+      val === 'gemini-omni-1.2-flash' || // GEMINI_OMNI_1_2_FE_V1
       val === 'gemini-omni'
     );
   }
@@ -424,7 +425,14 @@ export class FlowPromptBoxComponent implements OnInit, OnDestroy {
       return longest ? [longest] : [];
     }
 
-    return activeModel?.capabilities?.supportedDurations ?? [];
+    const supported: number[] =
+      activeModel?.capabilities?.supportedDurations ?? [];
+    // OMNI_REF_VIDEO_DURATION_CAP_V1: with a reference video attached the
+    // Interactions API caps Omni output at 10s (backend rejects longer).
+    if (isOmni && this.referenceVideo && !this.isTextToVideo()) {
+      return supported.filter(d => d <= 10);
+    }
+    return supported;
   }
 
   private updateSupportedResolutions(model?: any, modeChanged = false) {
