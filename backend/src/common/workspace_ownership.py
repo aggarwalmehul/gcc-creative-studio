@@ -46,6 +46,9 @@ async def owned_media_item(media_repo, item_id, workspace_id: int):
     item = await media_repo.get_by_id(item_id)
     if item is None:
         return None
+    # SOFT_DELETE_CHECK_V1: a soft-deleted item is treated as not found.
+    if getattr(item, "deleted_at", None) is not None:
+        return None
     if item.workspace_id != workspace_id:
         return None
     return item
@@ -61,6 +64,10 @@ async def owned_source_asset(source_asset_repo, asset_id, user: UserModel):
         return None
     asset = await source_asset_repo.get_by_id(asset_id)
     if asset is None:
+        return None
+    # SOFT_DELETE_CHECK_V1: a soft-deleted asset is treated as not found,
+    # including SYSTEM-scoped ones.
+    if getattr(asset, "deleted_at", None) is not None:
         return None
     is_admin = UserRoleEnum.ADMIN in user.roles
     is_owner = asset.user_id == user.id
