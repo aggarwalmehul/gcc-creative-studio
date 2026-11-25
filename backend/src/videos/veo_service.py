@@ -776,6 +776,17 @@ def _process_video_in_background(
                                                 "Gemini Omni interactions API call blocked by policy/content filter. Stopping retries."
                                             )
                                             break
+                                        # OMNI_NO_RETRY_ON_400_V1: a 400 invalid_request
+                                        # means the request itself is wrong; retrying
+                                        # can't succeed and only delays the failure.
+                                        if (
+                                            "invalid_request" in err_str
+                                            or "Error code: 400" in err_str
+                                        ):
+                                            worker_logger.error(
+                                                "Gemini Omni interactions API rejected the request (400). Stopping retries."
+                                            )
+                                            break
                                         if attempt < max_retries - 1:
                                             await asyncio.sleep(2)
                                         continue

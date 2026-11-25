@@ -279,6 +279,25 @@ class CreateVeoDto(BaseDto):
                 f"video(s) (got {n_ref_videos})."
             )
 
+        # OMNI_REF_VIDEO_DURATION_CAP_V1: with reference videos attached, the
+        # Interactions API treats the request as an extension and caps output
+        # at 10s ("Extension duration 15 seconds exceeds maximum duration 10
+        # seconds" -- confirmed on media item 3848, 25 Nov). Reject here with
+        # an immediate 422 instead of a ~2.5 min failed job.
+        if (
+            n_ref_videos > 0
+            and model in (
+                GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,
+                GenerationModelEnum.GEMINI_OMNI_1_2_FLASH,
+            )
+            and self.duration_seconds
+            and self.duration_seconds > 10
+        ):
+            raise ValueError(
+                f"With reference videos attached, '{model.value}' supports a "
+                f"maximum duration of 10 seconds (got {self.duration_seconds}s)."
+            )
+
         if has_any_references:
             # MODEL_CAPABILITY_PROPERTIES_V1: was a 9-member hardcoded set,
             # duplicated across 7+ locations in this file + veo_service.py;
