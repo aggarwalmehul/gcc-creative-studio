@@ -227,4 +227,4 @@ def test_validate_duration_seconds():
             generation_model=GenerationModelEnum.GEMINI_OMNI_FLASH_PREVIEW,
             duration_seconds=11,
         )
-    assert "less than or equal to 10" in str(exc_info.value)
+    assert "does not support duration" in str(exc_info.value)

@@ -279,6 +279,10 @@ class TestImagenServiceMethods:
         asset = MagicMock()
         asset.id = 101
         asset.gcs_uri = "gs://bucket/large.png"
+        # OWNERSHIP_MOCK_FIX_V1: owned_source_asset() rejects a non-None
+        # deleted_at and checks owner/scope; a bare MagicMock fails both.
+        asset.deleted_at = None
+        asset.user_id = sample_user.id
         mock_source_asset_repo.get_by_id.return_value = asset
         mock_gcs_service.download_bytes_from_gcs.return_value = (
             b"fake_image_bytes"
@@ -318,6 +322,10 @@ class TestImagenServiceMethods:
         media = MagicMock()
         media.id = 111
         media.gcs_uris = ["gs://bucket/existing_media.png"]
+        # OWNERSHIP_MOCK_FIX_V1: owned_media_item() rejects deleted items and
+        # items whose workspace_id differs from the request's (1).
+        media.deleted_at = None
+        media.workspace_id = 1
         mock_media_repo.get_by_id.return_value = media
 
         placeholder = MediaItemModel(
@@ -846,10 +854,14 @@ def test_process_vto_in_background_sync(
         person_asset = MagicMock()
         person_asset.id = 101
         person_asset.gcs_uri = "gs://bucket/person.png"
+        person_asset.deleted_at = None  # OWNERSHIP_MOCK_FIX_V1
+        person_asset.user_id = sample_user.id
 
         top_asset = MagicMock()
         top_asset.id = 102
         top_asset.gcs_uri = "gs://bucket/garment.png"
+        top_asset.deleted_at = None
+        top_asset.user_id = sample_user.id
 
         def get_by_id_side_effect(asset_id):
             if asset_id == 101:
@@ -935,6 +947,8 @@ def test_process_upload_upscale_in_background_sync(
         existing_asset = MagicMock()
         existing_asset.id = 301
         existing_asset.gcs_uri = "gs://bucket/original.png"
+        existing_asset.deleted_at = None  # OWNERSHIP_MOCK_FIX_V1
+        existing_asset.user_id = sample_user.id
         mock_sa_repo.get_by_id.return_value = existing_asset
 
         # Call the worker
@@ -1087,6 +1101,8 @@ def test_process_vto_in_background_sync_media_item(
         parent_item = MagicMock()
         parent_item.id = 111
         parent_item.gcs_uris = ["gs://bucket/person_gen.png"]
+        parent_item.deleted_at = None  # OWNERSHIP_MOCK_FIX_V1
+        parent_item.workspace_id = 1
 
         # Make get_by_id return parent_item if id matches 111
         def get_by_id_media_side_effect(media_id):
@@ -1100,6 +1116,8 @@ def test_process_vto_in_background_sync_media_item(
         top_asset = MagicMock()
         top_asset.id = 102
         top_asset.gcs_uri = "gs://bucket/garment.png"
+        top_asset.deleted_at = None
+        top_asset.user_id = sample_user.id
         mock_sa_repo.get_by_id.return_value = top_asset
 
         mock_gcs = MagicMock()
