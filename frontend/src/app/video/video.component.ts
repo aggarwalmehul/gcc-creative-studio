@@ -577,9 +577,13 @@ export class VideoComponent implements OnInit, AfterViewInit {
         m => m.value === this.searchRequest.generationModel,
       );
       if (!currentModelConfig?.capabilities?.supportsVideoExtension) {
-        const omniModel = this.generationModels.find(
-          m => m.value === 'gemini-omni-flash-preview',
-        );
+        // OMNI_FALLBACK_EXISTING_MODEL_V1: 'gemini-omni-flash-preview' is no
+        // longer in MODEL_CONFIGS, so this lookup never matched.
+        const omniModel =
+          this.generationModels.find(m => m.value === 'gemini-omni-1.2-flash') ??
+          this.generationModels.find(
+            m => m.value === 'gemini-omni-1.1-flash-preview',
+          );
         if (omniModel) {
           this.selectModel(omniModel);
           handleSuccessSnackbar(
@@ -770,10 +774,16 @@ export class VideoComponent implements OnInit, AfterViewInit {
     }
 
     // MULTI_VIDEO_UI_V1 / OUTPUT_FOLDER_UI_V1
-    const videosForRequest = this.referenceVideos.slice(
-      0,
-      this.maxReferenceVideos,
-    );
+    // HIDDEN_VIDEO_GATE_V1: the Video Ref slot only exists on Omni, so never
+    // send a reference video left over in page state on a non-Omni model.
+    const isOmniForVideos = [
+      'gemini-omni-flash-preview',
+      'gemini-omni-1.1-flash-preview',
+      'gemini-omni-1.2-flash',
+    ].includes(this.searchRequest.generationModel);
+    const videosForRequest = isOmniForVideos
+      ? this.referenceVideos.slice(0, this.maxReferenceVideos)
+      : [];
     const activeWsForFolder = this.workspaceStateService.getActiveWorkspaceId();
     const folderIdForRequest =
       this.outputFolder && this.outputFolder.workspaceId === activeWsForFolder
@@ -1289,9 +1299,11 @@ export class VideoComponent implements OnInit, AfterViewInit {
       const veo31Model = this.generationModels.find(
         m => m.value === 'veo-3.1-generate-001',
       );
-      const omniModel = this.generationModels.find(
-        m => m.value === 'gemini-omni-flash-preview',
-      );
+      const omniModel =
+        this.generationModels.find(m => m.value === 'gemini-omni-1.2-flash') ??
+        this.generationModels.find(
+          m => m.value === 'gemini-omni-1.1-flash-preview',
+        );
 
       if (veo31Model) {
         this.selectModel(veo31Model);
@@ -1894,6 +1906,17 @@ export class VideoComponent implements OnInit, AfterViewInit {
     }
   }
 
+  // REF_IMAGE_NO_FORCED_SWITCH_V1: only switch models when the current one
+  // truly can't take reference images (read from MODEL_CONFIGS).
+  private modelAcceptsReferenceImages(model: string): boolean {
+    const caps = MODEL_CONFIGS.find(m => m.value === model)?.capabilities;
+    return (
+      !!caps &&
+      caps.maxReferenceImages > 0 &&
+      caps.supportedModes.includes('Ingredients to Video')
+    );
+  }
+
   private handleReferenceImageAdded(): void {
     if (this.referenceImages.length === 1) {
       // If there's a start/end frame or a video for extension/concatenation, clear them.
@@ -1917,15 +1940,16 @@ export class VideoComponent implements OnInit, AfterViewInit {
       if (
         currentModel === 'gemini-omni-flash-preview' ||
         currentModel === 'gemini-omni-1.1-flash-preview' ||
-        currentModel === 'gemini-omni-1.2-flash' // GEMINI_OMNI_1_2_FE_V1
+        currentModel === 'gemini-omni-1.2-flash' || // GEMINI_OMNI_1_2_FE_V1
+        this.modelAcceptsReferenceImages(currentModel) // REF_IMAGE_NO_FORCED_SWITCH_V1
       ) {
-        // Already on an Omni model
+        // Already on a model that accepts reference images
       } else {
-        const omniModel = this.generationModels.find(
-          m =>
-            m.value === 'gemini-omni-1.1-flash-preview' ||
-            m.value === 'gemini-omni-flash-preview',
-        );
+        const omniModel =
+          this.generationModels.find(m => m.value === 'gemini-omni-1.2-flash') ??
+          this.generationModels.find(
+            m => m.value === 'gemini-omni-1.1-flash-preview',
+          );
         if (omniModel) {
           if (this.searchRequest.generationModel !== omniModel.value) {
             this.selectModel(omniModel);
