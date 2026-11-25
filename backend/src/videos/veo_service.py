@@ -446,33 +446,32 @@ def _process_video_in_background(
                             thought_signature = None
 
                             # Resolve reference video & reference audio URIs
-                            ref_video_uri = None
-                            if request_dto.reference_video:
-                                ref = request_dto.reference_video
+                            # MULTI_VIDEO_REFS_V1: resolve every reference video (max 3)
+                            ref_video_uris: list[str] = []
+                            for ref in request_dto.all_reference_videos():
                                 if ref.type == "media_item":
                                     parent_item = await owned_media_item(
                                         media_repo, ref.id, request_dto.workspace_id
                                     )
                                     if parent_item and parent_item.gcs_uris:
                                         index = ref.index or 0
-                                        if (
-                                            0
-                                            <= index
-                                            < len(parent_item.gcs_uris)
-                                        ):
-                                            ref_video_uri = (
-                                                parent_item.gcs_uris[index]
-                                            )
-                                        else:
-                                            ref_video_uri = (
-                                                parent_item.gcs_uris[0]
-                                            )
+                                        if not (0 <= index < len(parent_item.gcs_uris)):
+                                            index = 0
+                                        ref_video_uris.append(parent_item.gcs_uris[index])
+                                    else:
+                                        worker_logger.warning(
+                                            "Reference video media_item %s not usable; skipping.", ref.id
+                                        )
                                 else:
                                     video_asset = await owned_source_asset(
                                         source_asset_repo, ref.id, user
                                     )
-                                    if video_asset:
-                                        ref_video_uri = video_asset.gcs_uri
+                                    if video_asset and video_asset.gcs_uri:
+                                        ref_video_uris.append(video_asset.gcs_uri)
+                                    else:
+                                        worker_logger.warning(
+                                            "Reference video asset %s not usable; skipping.", ref.id
+                                        )
 
                             ref_audio_uri = None
                             if request_dto.reference_audio:
@@ -688,7 +687,7 @@ def _process_video_in_background(
                                         }
                                     )
 
-                                if ref_video_uri:
+                                for ref_video_uri in ref_video_uris:  # MULTI_VIDEO_REFS_V1
                                     t1_inputs.append(
                                         {
                                             "type": "video",
@@ -1554,8 +1553,7 @@ class VeoService:
                     ),
                 )
 
-        if request_dto.reference_video:
-            ref = request_dto.reference_video
+        for ref in request_dto.all_reference_videos():  # MULTI_VIDEO_REFS_V1
             if ref.type == "media_item":
                 source_media_items.append(
                     SourceMediaItemLink(

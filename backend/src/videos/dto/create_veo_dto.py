@@ -158,6 +158,11 @@ class CreateVeoDto(BaseDto):
         ge=1,
         description="Optional gallery folder (same workspace) to save the generated video into. OUTPUT_FOLDER_V1.",
     )
+    reference_videos: list[AssetReferenceDto] | None = Field(
+        default=None,
+        max_length=3,
+        description="Up to 3 reference videos (Omni 1.1/1.2). MULTI_VIDEO_REFS_V1.",
+    )
     reference_audio: AssetReferenceDto | None = Field(
         default=None,
         description="Object containing ID and type of asset to use as a reference audio.",
@@ -174,6 +179,20 @@ class CreateVeoDto(BaseDto):
         default="1K",
         description="Resolution of the generated videos.",
     )
+
+    def all_reference_videos(self) -> list[AssetReferenceDto]:
+        """MULTI_VIDEO_REFS_V1: reference_videos plus the legacy single
+        reference_video, de-duplicated by (type, id, index)."""
+        out, seen = [], set()
+        refs = list(self.reference_videos or [])
+        if self.reference_video:
+            refs.append(self.reference_video)
+        for ref in refs:
+            key = (ref.type, ref.id, (ref.index or 0) if ref.type == "media_item" else 0)
+            if key not in seen:
+                seen.add(key)
+                out.append(ref)
+        return out
 
     @model_validator(mode="after")
     def validate_cross_fields(self) -> "CreateVeoDto":
@@ -242,9 +261,23 @@ class CreateVeoDto(BaseDto):
         has_asset_references = (
             bool(self.reference_images)
             or bool(self.reference_video)
+            or bool(self.reference_videos)
             or bool(self.reference_audio)
         )
         has_any_references = has_asset_references or reference_roles_present
+
+        # MULTI_VIDEO_REFS_V1: Omni 1.1/1.2 accept up to 3 reference videos;
+        # every other model keeps the legacy limit of one.
+        n_ref_videos = len(self.all_reference_videos())
+        max_ref_videos = 3 if model in (
+            GenerationModelEnum.GEMINI_OMNI_1_1_FLASH_PREVIEW,
+            GenerationModelEnum.GEMINI_OMNI_1_2_FLASH,
+        ) else 1
+        if n_ref_videos > max_ref_videos:
+            raise ValueError(
+                f"Model '{model.value}' supports up to {max_ref_videos} reference "
+                f"video(s) (got {n_ref_videos})."
+            )
 
         if has_any_references:
             # MODEL_CAPABILITY_PROPERTIES_V1: was a 9-member hardcoded set,
