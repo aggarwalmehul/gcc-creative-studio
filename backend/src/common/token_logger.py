@@ -26,7 +26,22 @@ current_user_email = contextvars.ContextVar("current_user_email", default="unkno
 # Without this, calls made via interactions.create() would silently be
 # skipped ("no usage_metadata on resp") even though they DO carry usage
 # data, just under a different attribute name and field names.
-def _normalize_usage(resp):
+def _normalize_usage(resp, model=""):
+    """THINKING_TOKENS_V1: reasoning tokens are counted in the total but not in the
+    candidates/output count, and Google bills them as output. Any tokens beyond
+    input + output are therefore added to output, so the dashboard (which prices
+    tokens_in/tokens_out only) sees them. Image models are skipped: their output
+    rate is an image-output rate and the billing of their reasoning tokens is unverified."""
+    raw = _normalize_usage_raw(resp)
+    if raw is None:
+        return None
+    tin, tout, total = raw
+    if total > tin + tout and not any(k in str(model).lower() for k in ("image", "banana")):
+        tout = total - tin
+    return (tin, tout, total)
+
+
+def _normalize_usage_raw(resp):
     """Returns (prompt_tokens, candidates_tokens, total_tokens) from
     whichever of the two known usage shapes `resp` actually has, or
     None if neither is present."""
@@ -50,7 +65,7 @@ def _normalize_usage(resp):
 def log_tokens(platform: str, model: str, resp):
     if _bq is None:
         log.warning("TOKENLOG: skip — no bq client"); return
-    usage = _normalize_usage(resp)
+    usage = _normalize_usage(resp, model)
     if usage is None:
         log.warning("TOKENLOG: skip — no usage_metadata/usage on resp (type=%s)", type(resp).__name__); return
     tokens_in, tokens_out, total = usage

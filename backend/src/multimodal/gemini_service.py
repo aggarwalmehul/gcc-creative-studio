@@ -514,6 +514,10 @@ class GeminiService:
                     response_schema=GenerateTitleResponseDto,
                 ),
             )
+            try:  # LOG_ALL_GEMINI_CALLS_V1
+                log_tokens("creative-studio", self.rewriter_model, response)
+            except Exception as _log_err:  # logging must never fail the request
+                logger.warning("TOKENLOG failed: %s", _log_err)
             return json.loads(response.text or "{}")
         except Exception as e:
             logger.error("Failed to generate title and summary: %s", e)
@@ -596,6 +600,10 @@ class GeminiService:
                     response_schema=GenerateMediaMetadataResponseDto,
                 ),
             )
+            try:  # LOG_ALL_GEMINI_CALLS_V1
+                log_tokens("creative-studio", normalize_retired_text_model(model_name), response)
+            except Exception as _log_err:  # logging must never fail the request
+                logger.warning("TOKENLOG failed: %s", _log_err)
             raw_result = json.loads(response.text or "{}")
             items = raw_result.get("items") or []
             titles = [
@@ -816,6 +824,11 @@ class GeminiService:
                 contents=contents,
                 **config_args,
             )
+            import asyncio as _aio  # LOG_ALL_GEMINI_CALLS_V1
+            try:
+                await _aio.to_thread(log_tokens, "creative-studio", normalize_retired_text_model(request.model), response)
+            except Exception as _log_err:  # logging must never fail the request
+                logger.warning("TOKENLOG failed: %s", _log_err)
             return response.text or ""
         except HTTPException as http_exc:
             raise http_exc
