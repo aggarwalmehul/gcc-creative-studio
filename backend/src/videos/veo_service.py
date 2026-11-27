@@ -40,6 +40,7 @@ from src.common.media_utils import (
     generate_thumbnail,
 )
 from src.common.task_queue import enqueue_thumbnail_task  # FEATURE_PORT_CLOUD_TASKS_THUMBNAILS_V1
+from src.common.token_logger import billing_model_key  # VEO_NOAUDIO_BILLING_V1
 from src.common.schema.genai_model_setup import GenAIModelSetup
 from src.common.token_logger import log_tokens  # TOKEN_LOGGING_AUDIT_FIX_V1
 from src.common.token_logger import log_billing_units  # FEATURE_PORT_BILLING_UNITS_V1
@@ -1239,7 +1240,7 @@ def _process_video_in_background(
                                 if _dur and _count:
                                     log_billing_units(
                                         "creative-studio",
-                                        getattr(request_dto.generation_model, "value", str(request_dto.generation_model)),
+                                        billing_model_key(request_dto.generation_model, getattr(request_dto, "generate_audio", None)),
                                         "video_seconds",
                                         float(_dur) * _count,
                                     )

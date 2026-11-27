@@ -117,3 +117,13 @@ def log_billing_units(platform: str, model: str, unit_type: str, quantity):
             log.info("BILLINGUNITS: inserted %.3f %s for %s", q, unit_type, model)
     except Exception as e:
         log.warning("BILLINGUNITS: insert exception: %s", e)
+
+
+def billing_model_key(model, generate_audio=None):
+    """VEO_NOAUDIO_BILLING_V1: Vertex bills Veo 3.1 without audio at 0.20/s and with audio at
+    0.40/s (Nov 2026 billing report). Only full Veo 3.1 called with audio explicitly off gets
+    its own key (priced in pricing.json billing_units); an unknown flag counts as audio."""
+    name = getattr(model, "value", str(model))
+    if name == "veo-3.1-generate-001" and generate_audio is False:
+        return name + "-noaudio"
+    return name
